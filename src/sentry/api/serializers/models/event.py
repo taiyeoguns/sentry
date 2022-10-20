@@ -22,8 +22,7 @@ RESERVED_KEYS = frozenset(["user", "sdk", "device", "contexts"])
 
 
 def get_crash_files(events):
-    event_ids = [x.event_id for x in events if x.platform == "native"]
-    if event_ids:
+    if event_ids := [x.event_id for x in events if x.platform == "native"]:
         return [
             ea
             for ea in EventAttachment.objects.filter(event_id__in=event_ids)
@@ -38,11 +37,7 @@ def get_tags_with_meta(event):
     # If we have meta, we need to get the tags in their original order
     # from the raw event body as the indexes need to line up with the
     # metadata indexes. In other cases we can use event.tags
-    if meta:
-        raw_tags = event.data.get("tags") or []
-    else:
-        raw_tags = event.tags
-
+    raw_tags = event.data.get("tags") or [] if meta else event.tags
     tags = sorted(
         (
             {
@@ -65,8 +60,7 @@ def get_tags_with_meta(event):
     # Add 'query' for each tag to tell the UI what to use as query
     # params for this tag.
     for tag in tags:
-        query = convert_user_tag_to_query(tag["key"], tag["value"])
-        if query:
+        if query := convert_user_tag_to_query(tag["key"], tag["value"]):
             tag["query"] = query
 
     tags_meta = prune_empty_keys({str(i): e.pop("_meta") for i, e in enumerate(tags)})
@@ -141,10 +135,7 @@ class EventSerializer(Serializer):
 
         api_meta = interface.get_api_meta(event_meta[name], is_public=is_public, platform=platform)
         # data might not be returned for e.g. a public HTTP repr
-        if not api_meta:
-            return (data, None)
-
-        return (data, meta_with_chunks(data, api_meta))
+        return (data, meta_with_chunks(data, api_meta)) if api_meta else (data, None)
 
     def _get_attr_with_meta(self, event, attr, default=None):
         value = event.data.get(attr, default)
@@ -224,14 +215,15 @@ class EventSerializer(Serializer):
 
     def should_display_error(self, error):
         name = error.get("name")
-        if not isinstance(name, str):
-            return True
-
         return (
-            not name.startswith("breadcrumbs.")
-            and not name.startswith("extra.")
-            and not name.startswith("tags.")
-            and ".frames." not in name
+            (
+                not name.startswith("breadcrumbs.")
+                and not name.startswith("extra.")
+                and not name.startswith("tags.")
+                and ".frames." not in name
+            )
+            if isinstance(name, str)
+            else True
         )
 
     def serialize(self, obj, attrs, user):
@@ -294,7 +286,7 @@ class EventSerializer(Serializer):
         }
         # Serialize attributes that are specific to different types of events.
         if obj.get_event_type() == "transaction":
-            d.update(self.__serialize_transaction_attrs(attrs, obj))
+            d |= self.__serialize_transaction_attrs(attrs, obj)
         else:
             d.update(self.__serialize_error_attrs(attrs, obj))
         return d
@@ -397,8 +389,7 @@ class SimpleEventSerializer(EventSerializer):
     def serialize(self, obj, attrs, user):
         tags = [{"key": key.split("sentry:", 1)[-1], "value": value} for key, value in obj.tags]
         for tag in tags:
-            query = convert_user_tag_to_query(tag["key"], tag["value"])
-            if query:
+            if query := convert_user_tag_to_query(tag["key"], tag["value"]):
                 tag["query"] = query
 
         user = obj.get_minimal_user()
@@ -433,8 +424,7 @@ class ExternalEventSerializer(EventSerializer):
     def serialize(self, obj, attrs, user):
         tags = [{"key": key.split("sentry:", 1)[-1], "value": value} for key, value in obj.tags]
         for tag in tags:
-            query = convert_user_tag_to_query(tag["key"], tag["value"])
-            if query:
+            if query := convert_user_tag_to_query(tag["key"], tag["value"]):
                 tag["query"] = query
 
         user = obj.get_minimal_user()

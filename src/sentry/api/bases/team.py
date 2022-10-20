@@ -23,10 +23,7 @@ class TeamPermission(OrganizationPermission):
 
     def has_object_permission(self, request: Request, view, team):
         result = super().has_object_permission(request, view, team.organization)
-        if not result:
-            return result
-
-        return has_team_permission(request, team, self.scope_map)
+        return has_team_permission(request, team, self.scope_map) if result else result
 
 
 class TeamEndpoint(Endpoint):

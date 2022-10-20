@@ -54,11 +54,11 @@ class OrganizationPermission(SentryPermission):
         # logic for checking valid SSO
         if not request.access.requires_sso:
             return False
-        if not auth.has_completed_sso(request, organization.id):
-            return True
-        if not request.access.sso_is_valid:
-            return True
-        return False
+        return (
+            not request.access.sso_is_valid
+            if auth.has_completed_sso(request, organization.id)
+            else True
+        )
 
     def has_object_permission(self, request: Request, view, organization):
         self.determine_access(request, organization)
@@ -356,8 +356,7 @@ class OrganizationEndpoint(Endpoint):
             "organization_id": organization.id,
         }
 
-        environments = self.get_environments(request, organization)
-        if environments:
+        if environments := self.get_environments(request, organization):
             params["environment"] = [env.name for env in environments]
             params["environment_objects"] = environments
 
@@ -415,17 +414,20 @@ class OrganizationReleasesBaseEndpoint(OrganizationEndpoint):
                 "project:releases"
             ) or request.auth.has_scope("project:write")
 
-        if not (
-            has_valid_api_key or (getattr(request, "user", None) and request.user.is_authenticated)
-        ):
-            return []
-
-        return super().get_projects(
-            request,
-            organization,
-            force_global_perms=has_valid_api_key,
-            include_all_accessible=include_all_accessible,
-            project_ids=project_ids,
+        return (
+            []
+            if not has_valid_api_key
+            and (
+                not getattr(request, "user", None)
+                or not request.user.is_authenticated
+            )
+            else super().get_projects(
+                request,
+                organization,
+                force_global_perms=has_valid_api_key,
+                include_all_accessible=include_all_accessible,
+                project_ids=project_ids,
+            )
         )
 
     def has_release_permission(self, request: Request, organization, release):
@@ -437,18 +439,17 @@ class OrganizationReleasesBaseEndpoint(OrganizationEndpoint):
         for a minute on the unique combination of actor,org,release, and project
         ids.
         """
-        actor_id = None
         has_perms = None
         key = None
+        actor_id = None
         if getattr(request, "user", None) and request.user.id:
-            actor_id = "user:%s" % request.user.id
+            actor_id = f"user:{request.user.id}"
         if getattr(request, "auth", None) and request.auth.id:
-            actor_id = "apikey:%s" % request.auth.id
+            actor_id = f"apikey:{request.auth.id}"
         if actor_id is not None:
             project_ids = sorted(self.get_requested_project_ids_unchecked(request))
-            key = "release_perms:1:%s" % hash_values(
-                [actor_id, organization.id, release.id] + project_ids
-            )
+            key = f"release_perms:1:{hash_values([actor_id, organization.id, release.id] + project_ids)}"
+
             has_perms = cache.get(key)
         if has_perms is None:
             has_perms = ReleaseProject.objects.filter(

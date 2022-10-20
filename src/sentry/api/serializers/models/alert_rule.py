@@ -57,8 +57,9 @@ class AlertRuleSerializer(Serializer):
                 "triggers", []
             )
             for action in serialized.get("actions", []):
-                install = sentry_app_installations_by_sentry_app_id.get(action.get("sentryAppId"))
-                if install:
+                if install := sentry_app_installations_by_sentry_app_id.get(
+                    action.get("sentryAppId")
+                ):
                     action["_sentry_app_component"] = install.get("sentry_app_component")
                     action["_sentry_app_installation"] = install.get("sentry_app_installation")
                     action["sentryAppInstallationUuid"] = install.get(
@@ -87,17 +88,20 @@ class AlertRuleSerializer(Serializer):
 
             result[alert_rules[rule_activity.alert_rule.id]].update({"created_by": user})
 
-        resolved_actors = {}
         owners_by_type = defaultdict(list)
         for item in item_list:
             if item.owner_id is not None:
                 owners_by_type[actor_type_to_string(item.owner.type)].append(item.owner_id)
 
-        for k, v in ACTOR_TYPES.items():
-            resolved_actors[k] = {
+        resolved_actors = {
+            k: {
                 a.actor_id: a.id
-                for a in actor_type_to_class(v).objects.filter(actor_id__in=owners_by_type[k])
+                for a in actor_type_to_class(v).objects.filter(
+                    actor_id__in=owners_by_type[k]
+                )
             }
+            for k, v in ACTOR_TYPES.items()
+        }
 
         for alert_rule in alert_rules.values():
             if alert_rule.owner_id:
@@ -118,16 +122,18 @@ class AlertRuleSerializer(Serializer):
                 ] = activity.previous_alert_rule_id
 
         if "latestIncident" in self.expand:
-            incident_map = {}
-            for incident in Incident.objects.filter(
-                id__in=Incident.objects.filter(alert_rule__in=alert_rules)
-                .values("alert_rule_id")
-                .annotate(incident_id=Max("id"))
-                .values("incident_id")
-            ):
-                incident_map[incident.alert_rule_id] = serialize(incident, user=user)
+            incident_map = {
+                incident.alert_rule_id: serialize(incident, user=user)
+                for incident in Incident.objects.filter(
+                    id__in=Incident.objects.filter(alert_rule__in=alert_rules)
+                    .values("alert_rule_id")
+                    .annotate(incident_id=Max("id"))
+                    .values("incident_id")
+                )
+            }
+
             for alert_rule in alert_rules.values():
-                result[alert_rule]["latestIncident"] = incident_map.get(alert_rule.id, None)
+                result[alert_rule]["latestIncident"] = incident_map.get(alert_rule.id)
 
         return result
 

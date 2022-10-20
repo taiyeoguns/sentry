@@ -40,12 +40,12 @@ class OrganizationIntegrationDetailsEndpoint(OrganizationIntegrationBaseEndpoint
         if integration.provider != "custom_scm":
             return self.respond({"detail": "Invalid action for this integration"}, status=400)
 
-        update_kwargs = {}
-
         serializer = IntegrationSerializer(data=request.data, partial=True)
 
         if serializer.is_valid():
             data = serializer.validated_data
+            update_kwargs = {}
+
             if data.get("name"):
                 update_kwargs["name"] = data["name"]
             if data.get("domain") is not None:
@@ -77,11 +77,9 @@ class OrganizationIntegrationDetailsEndpoint(OrganizationIntegrationBaseEndpoint
         integration.get_installation(organization.id).uninstall()
 
         with transaction.atomic():
-            updated = OrganizationIntegration.objects.filter(
+            if updated := OrganizationIntegration.objects.filter(
                 id=org_integration.id, status=ObjectStatus.VISIBLE
-            ).update(status=ObjectStatus.PENDING_DELETION)
-
-            if updated:
+            ).update(status=ObjectStatus.PENDING_DELETION):
                 ScheduledDeletion.schedule(org_integration, days=0, actor=request.user)
                 create_audit_entry(
                     request=request,

@@ -9,10 +9,7 @@ class GroupTombstoneSerializer(Serializer):
         user_list = list(User.objects.filter(id__in=[item.actor_id for item in item_list]))
         users = {u.id: d for u, d in zip(user_list, serialize(user_list, user))}
 
-        attrs = {}
-        for item in item_list:
-            attrs[item] = {"user": users.get(item.actor_id, {})}
-        return attrs
+        return {item: {"user": users.get(item.actor_id, {})} for item in item_list}
 
     def serialize(self, obj, attrs, user):
         return {

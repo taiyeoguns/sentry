@@ -24,9 +24,7 @@ class SiloMode(Enum):
     def resolve(cls, mode: str | SiloMode | None) -> SiloMode:
         if not mode:
             return cls.MONOLITH
-        if isinstance(mode, SiloMode):
-            return mode
-        return cls[mode]
+        return mode if isinstance(mode, SiloMode) else cls[mode]
 
     def __str__(self) -> str:
         return self.value
@@ -97,13 +95,12 @@ class SiloLimit(abc.ABC):
 
             if is_available:
                 return original_method(*args, **kwargs)
-            else:
-                handler = self.handle_when_unavailable(
-                    original_method,
-                    SiloMode.get_current_mode(),
-                    itertools.chain([SiloMode.MONOLITH], self.modes, extra_modes),
-                )
-                return handler(*args, **kwargs)
+            handler = self.handle_when_unavailable(
+                original_method,
+                SiloMode.get_current_mode(),
+                itertools.chain([SiloMode.MONOLITH], self.modes, extra_modes),
+            )
+            return handler(*args, **kwargs)
 
         functools.update_wrapper(override, original_method)
         return override

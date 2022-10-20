@@ -63,8 +63,7 @@ class ProjectEventDetailsEndpoint(ProjectEndpoint):
                     group_ids=[event.group_id],
                 )
 
-            requested_environments = set(request.GET.getlist("environment"))
-            if requested_environments:
+            if requested_environments := set(request.GET.getlist("environment")):
                 conditions.append(["environment", "IN", requested_environments])
 
             # Ignore any time params and search entire retention period

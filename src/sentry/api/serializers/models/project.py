@@ -133,12 +133,12 @@ def get_features_for_projects(
 
     batch_checked = set()
     for (organization, projects) in projects_by_org.items():
-        batch_features = features.batch_has(
-            project_features, actor=user, projects=projects, organization=organization
-        )
-
-        # batch_has has found some features
-        if batch_features:
+        if batch_features := features.batch_has(
+            project_features,
+            actor=user,
+            projects=projects,
+            organization=organization,
+        ):
             for project in projects:
                 for feature_name, active in batch_features.get(f"project:{project.id}", {}).items():
                     if active:
@@ -243,15 +243,10 @@ class ProjectSerializer(Serializer):  # type: ignore
         self.collapse = collapse
 
     def _expand(self, key: str) -> bool:
-        if self.expand is None:
-            return False
-
-        return key in self.expand
+        return False if self.expand is None else key in self.expand
 
     def _collapse(self, key: str) -> bool:
-        if self.collapse is None:
-            return False
-        return key in self.collapse
+        return False if self.collapse is None else key in self.collapse
 
     def get_attrs(
         self, item_list: Sequence[Project], user: User, **kwargs: Any
@@ -375,8 +370,11 @@ class ProjectSerializer(Serializer):  # type: ignore
             serialized = []
             str_id = str(project_id)
             if str_id in stats:
-                for item in stats[str_id].data["data"]:
-                    serialized.append((item["time"], item.get("count", 0)))
+                serialized.extend(
+                    (item["time"], item.get("count", 0))
+                    for item in stats[str_id].data["data"]
+                )
+
             results[project_id] = serialized
         return results
 
@@ -654,9 +652,11 @@ class ProjectSummarySerializer(ProjectWithTeamSerializer):
             for release in bulk_fetch_project_latest_releases(item_list)
         }
 
-        deploys_by_project = None
-        if not self._collapse(LATEST_DEPLOYS_KEY):
-            deploys_by_project = self.get_deploys_by_project(item_list)
+        deploys_by_project = (
+            None
+            if self._collapse(LATEST_DEPLOYS_KEY)
+            else self.get_deploys_by_project(item_list)
+        )
 
         for item in item_list:
             attrs[item]["latest_release"] = latest_release_versions.get(item.id)
@@ -770,10 +770,7 @@ class DetailedProjectSerializer(ProjectWithTeamSerializer):
             .values_list("id", "num_issues")
         )
 
-        processing_issues_by_project = {}
-        for project_id, num_issues in num_issues_projects:
-            processing_issues_by_project[project_id] = num_issues
-
+        processing_issues_by_project = dict(num_issues_projects)
         queryset = ProjectOption.objects.filter(project__in=item_list, key__in=OPTION_KEYS)
         options_by_project = defaultdict(dict)
         for option in queryset.iterator():
@@ -911,10 +908,11 @@ class SharedProjectSerializer(Serializer):
     def serialize(self, obj, attrs, user):
         from sentry import features
 
-        feature_list = []
-        for feature in ():
-            if features.has("projects:" + feature, obj, actor=user):
-                feature_list.append(feature)
+        feature_list = [
+            feature
+            for feature in ()
+            if features.has(f"projects:{feature}", obj, actor=user)
+        ]
 
         return {
             "slug": obj.slug,

@@ -12,9 +12,8 @@ def fix(data):
     # There was a point in time where full Team objects
     # got serialized into our AuditLogEntry.data, so these
     # values need to be stripped and reduced down to integers
-    if data.get("teams"):
-        if hasattr(data["teams"][0], "id"):
-            data["teams"] = [t.id for t in data["teams"]]
+    if data.get("teams") and hasattr(data["teams"][0], "id"):
+        data["teams"] = [t.id for t in data["teams"]]
 
     return data
 
@@ -27,8 +26,7 @@ def override_actor_id(user):
         scim_prefix
         + r"[0-9a-fA-F]{6}\-[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{7}"
     )
-    scim_match = re.match(scim_regex, user.get_display_name())
-    return scim_match
+    return re.match(scim_regex, user.get_display_name())
 
 
 @register(AuditLogEntry)

@@ -4,11 +4,11 @@ from sentry.models import CommitAuthor, PullRequest, Repository
 
 
 def get_users_for_pull_requests(item_list, user=None):
-    authors = list(
-        CommitAuthor.objects.filter(id__in=[i.author_id for i in item_list if i.author_id])
-    )
-
-    if authors:
+    if authors := list(
+        CommitAuthor.objects.filter(
+            id__in=[i.author_id for i in item_list if i.author_id]
+        )
+    ):
         org_ids = {item.organization_id for item in item_list}
         if len(org_ids) == 1:
             return get_users_for_authors(organization_id=org_ids.pop(), authors=authors, user=user)

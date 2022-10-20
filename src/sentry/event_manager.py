@@ -174,20 +174,16 @@ def has_pending_commit_resolution(group):
     if latest_issue_commit_resolution is None:
         return False
 
-    # commit has been released and is not in pending commit state
     if ReleaseCommit.objects.filter(commit__id=latest_issue_commit_resolution.linked_id).exists():
         return False
-    else:
-        # check if this commit is a part of a PR
-        pr_ids = PullRequest.objects.filter(
-            pullrequestcommit__commit=latest_issue_commit_resolution.linked_id
-        ).values_list("id", flat=True)
+    # check if this commit is a part of a PR
+    pr_ids = PullRequest.objects.filter(
+        pullrequestcommit__commit=latest_issue_commit_resolution.linked_id
+    ).values_list("id", flat=True)
         # assume that this commit has been released if any commits in this PR have been released
-        if ReleaseCommit.objects.filter(
-            commit__pullrequestcommit__pull_request__in=pr_ids
-        ).exists():
-            return False
-        return True
+    return not ReleaseCommit.objects.filter(
+        commit__pullrequestcommit__pull_request__in=pr_ids
+    ).exists()
 
 
 def get_max_crashreports(model, allow_none=False):
@@ -539,12 +535,11 @@ class EventManager:
         _nodestore_save_many(jobs)
         save_unprocessed_event(project, job["event"].event_id)
 
-        if not raw:
-            if not project.first_event:
-                project.update(first_event=job["event"].datetime)
-                first_event_received.send_robust(
-                    project=project, event=job["event"], sender=Project
-                )
+        if not raw and not project.first_event:
+            project.update(first_event=job["event"].datetime)
+            first_event_received.send_robust(
+                project=project, event=job["event"], sender=Project
+            )
 
         if is_reprocessed:
             safe_execute(
@@ -609,7 +604,7 @@ def _auto_update_grouping(project):
 
     # update to latest grouping config but not if a user is already on
     # beta.
-    if old_grouping == new_grouping or old_grouping == BETA_GROUPING_CONFIG:
+    if old_grouping in [new_grouping, BETA_GROUPING_CONFIG]:
         return
 
     # Because the way the auto grouping upgrading happening is racy, we want to
@@ -726,14 +721,15 @@ def _is_commit_sha(version: str):
 
 def _associate_commits_with_release(release: Release, project: Project):
     previous_release = release.get_previous_release(project)
-    possible_repos = (
+    if possible_repos := (
         RepositoryProjectPathConfig.objects.select_related(
-            "repository", "organization_integration", "organization_integration__integration"
+            "repository",
+            "organization_integration",
+            "organization_integration__integration",
         )
         .filter(project=project, repository__provider="integrations:github")
         .all()
-    )
-    if possible_repos:
+    ):
         # If it does exist, kick off a task to look if the commit exists in the repository
         target_repo = None
         for repo_proj_path_model in possible_repos:
@@ -842,8 +838,9 @@ def _derive_plugin_tags_many(jobs, projects):
 
     for job in jobs:
         for plugin in plugins_for_projects[job["project_id"]]:
-            added_tags = safe_execute(plugin.get_tags, job["event"], _with_transaction=False)
-            if added_tags:
+            if added_tags := safe_execute(
+                plugin.get_tags, job["event"], _with_transaction=False
+            ):
                 data = job["data"]
                 # plugins should not override user provided tags
                 for key, value in added_tags:
@@ -998,12 +995,10 @@ def _tsdb_record_all_metrics(jobs):
     # XXX: validate whether anybody actually uses those metrics
 
     for job in jobs:
-        incrs = []
         frequencies = []
         records = []
-        incrs.append((tsdb.models.project, job["project_id"]))
+        incrs = [(tsdb.models.project, job["project_id"])]
         event = job["event"]
-        release = job["release"]
         environment = job["environment"]
         user = job["user"]
 
@@ -1028,7 +1023,7 @@ def _tsdb_record_all_metrics(jobs):
                     (tsdb.models.users_affected_by_group, group_info.group.id, (user.tag_value,))
                 )
 
-        if release:
+        if release := job["release"]:
             incrs.append((tsdb.models.release, release.id))
 
         if user:
@@ -1492,10 +1487,11 @@ def _find_existing_grouphash(
         # group attached to `hierarchical_hashes[0]`? Maybe.
         if group_hash.group_tombstone_id is not None:
             raise HashDiscarded(
-                "Matches group tombstone %s" % group_hash.group_tombstone_id,
+                f"Matches group tombstone {group_hash.group_tombstone_id}",
                 reason="discard",
                 tombstone_id=group_hash.group_tombstone_id,
             )
+
 
     return None, root_hierarchical_hash
 
@@ -1738,10 +1734,15 @@ def get_attachments(cache_key, job):
         return []
 
     attachments = list(attachment_cache.get(cache_key))
-    if not attachments:
-        return []
-
-    return [attachment for attachment in attachments if not attachment.rate_limited]
+    return (
+        [
+            attachment
+            for attachment in attachments
+            if not attachment.rate_limited
+        ]
+        if attachments
+        else []
+    )
 
 
 def filter_attachments_for_group(attachments, job):
@@ -2047,7 +2048,6 @@ def _save_aggregate_performance(jobs: Sequence[Performance_Job], projects):
     )
     for job in jobs:
         job["groups"] = []
-        hashes = []
         event = job["event"]
         project = event.project
 
@@ -2081,10 +2081,12 @@ def _save_aggregate_performance(jobs: Sequence[Performance_Job], projects):
                 project=project, hash__in=group_hashes
             ).select_related("group")
 
-            new_grouphashes = set(group_hashes) - {hash.hash for hash in existing_grouphashes}
-            new_grouphashes_count = len(new_grouphashes)
+            hashes = []
+            if new_grouphashes := set(group_hashes) - {
+                hash.hash for hash in existing_grouphashes
+            }:
+                new_grouphashes_count = len(new_grouphashes)
 
-            if new_grouphashes:
                 with metrics.timer("performance.performance_issue.check_write_limits"):
                     granted_quota = issue_rate_limiter.check_and_use_quotas(
                         [

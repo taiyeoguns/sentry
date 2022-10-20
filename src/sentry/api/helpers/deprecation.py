@@ -45,44 +45,44 @@ def _should_be_blocked(deprecation_date: datetime, now: datetime, key: str):
     11:59:59 would be allowed while one at 12:00:01 would not
     """
     # Will need to check redis if the hour fits into the brownout period
-    if now >= deprecation_date:
-        key = "api.deprecation.brownout" if not key else key
+    if now < deprecation_date:
+        return False
+    key = key or "api.deprecation.brownout"
 
-        # Retrieve any custom schedule saved
-        # Fall back on the default schedule if there's any issue getting a custom one
-        cron_key, duration_key = _serialize_key(key)
-        try:
-            brownout_cron = options.get(cron_key)
-        except UnknownOption:
-            logger.error(f"Unrecognized deprecation key {key}")
-            brownout_cron = options.get("api.deprecation.brownout-cron")
+    # Retrieve any custom schedule saved
+    # Fall back on the default schedule if there's any issue getting a custom one
+    cron_key, duration_key = _serialize_key(key)
+    try:
+        brownout_cron = options.get(cron_key)
+    except UnknownOption:
+        logger.error(f"Unrecognized deprecation key {key}")
+        brownout_cron = options.get("api.deprecation.brownout-cron")
 
-        try:
-            brownout_duration = options.get(duration_key)
-        except UnknownOption:
-            logger.error(f"Unrecognized deprecation duration {key}")
-            brownout_duration = options.get("api.deprecation.brownout-duration")
+    try:
+        brownout_duration = options.get(duration_key)
+    except UnknownOption:
+        logger.error(f"Unrecognized deprecation duration {key}")
+        brownout_duration = options.get("api.deprecation.brownout-duration")
 
-        # Validate the formats, allow requests to pass through if validation failed
-        try:
-            brownout_duration = isodate.parse_duration(brownout_duration)
-        except ISO8601Error:
-            logger.error("Invalid ISO8601 format for blackout duration")
-            return False
+    # Validate the formats, allow requests to pass through if validation failed
+    try:
+        brownout_duration = isodate.parse_duration(brownout_duration)
+    except ISO8601Error:
+        logger.error("Invalid ISO8601 format for blackout duration")
+        return False
 
-        if not croniter.is_valid(brownout_cron):
-            logger.error("Invalid crontab for blackout schedule")
-            return False
+    if not croniter.is_valid(brownout_cron):
+        logger.error("Invalid crontab for blackout schedule")
+        return False
 
-        # return True if now exactly matches the crontab
-        if croniter.match(brownout_cron, now):
-            return True
+    # return True if now exactly matches the crontab
+    if croniter.match(brownout_cron, now):
+        return True
 
-        # If not, check if now is within BROWNOUT_DURATION of the last brownout time
-        iter = croniter(brownout_cron, now)
-        brownout_start = iter.get_prev(datetime)
-        return brownout_start <= now < brownout_start + brownout_duration
-    return False
+    # If not, check if now is within BROWNOUT_DURATION of the last brownout time
+    iter = croniter(brownout_cron, now)
+    brownout_start = iter.get_prev(datetime)
+    return brownout_start <= now < brownout_start + brownout_duration
 
 
 def _add_deprecation_headers(

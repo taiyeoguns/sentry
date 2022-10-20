@@ -236,9 +236,9 @@ class GroupSerializerBase(Serializer, ABC):
         if len(organization_id_list) > 1:
             # this should never happen but if it does we should know about it
             logger.warning(
-                "Found multiple organizations for groups: %s, with orgs: %s"
-                % ([item.id for item in item_list], organization_id_list)
+                f"Found multiple organizations for groups: {[item.id for item in item_list]}, with orgs: {organization_id_list}"
             )
+
 
         # should only have 1 org at this point
         organization_id = organization_id_list[0]
@@ -340,7 +340,7 @@ class GroupSerializerBase(Serializer, ABC):
         if "is_unhandled" in attrs:
             group_dict["isUnhandled"] = attrs["is_unhandled"]
         if "times_seen" in attrs:
-            group_dict.update(self._convert_seen_stats(attrs))
+            group_dict |= self._convert_seen_stats(attrs)
         return group_dict
 
     @abstractmethod
@@ -356,15 +356,10 @@ class GroupSerializerBase(Serializer, ABC):
         pass
 
     def _expand(self, key) -> bool:
-        if self.expand is None:
-            return False
-
-        return key in self.expand
+        return False if self.expand is None else key in self.expand
 
     def _collapse(self, key) -> bool:
-        if self.collapse is None:
-            return False
-        return key in self.collapse
+        return False if self.collapse is None else key in self.collapse
 
     def _get_status(self, attrs: MutableMapping[str, Any], obj: Group):
         status = obj.status
@@ -373,26 +368,27 @@ class GroupSerializerBase(Serializer, ABC):
             snooze = attrs["ignore_until"]
             if snooze.is_valid(group=obj):
                 # counts return the delta remaining when window is not set
-                status_details.update(
-                    {
-                        "ignoreCount": (
-                            snooze.count - (obj.times_seen - snooze.state["times_seen"])
-                            if snooze.count and not snooze.window
-                            else snooze.count
-                        ),
-                        "ignoreUntil": snooze.until,
-                        "ignoreUserCount": (
-                            snooze.user_count - (attrs["user_count"] - snooze.state["users_seen"])
-                            if snooze.user_count
-                            and not snooze.user_window
-                            and not self._collapse("stats")
-                            else snooze.user_count
-                        ),
-                        "ignoreUserWindow": snooze.user_window,
-                        "ignoreWindow": snooze.window,
-                        "actor": attrs["ignore_actor"],
-                    }
-                )
+                status_details |= {
+                    "ignoreCount": (
+                        snooze.count
+                        - (obj.times_seen - snooze.state["times_seen"])
+                        if snooze.count and not snooze.window
+                        else snooze.count
+                    ),
+                    "ignoreUntil": snooze.until,
+                    "ignoreUserCount": (
+                        snooze.user_count
+                        - (attrs["user_count"] - snooze.state["users_seen"])
+                        if snooze.user_count
+                        and not snooze.user_window
+                        and not self._collapse("stats")
+                        else snooze.user_count
+                    ),
+                    "ignoreUserWindow": snooze.user_window,
+                    "ignoreWindow": snooze.window,
+                    "actor": attrs["ignore_actor"],
+                }
+
             else:
                 status = GroupStatus.UNRESOLVED
         if status == GroupStatus.UNRESOLVED and obj.is_over_resolve_age():
@@ -452,15 +448,12 @@ class GroupSerializerBase(Serializer, ABC):
         self, item_list: Sequence[Group], seen_stats: Optional[Mapping[Group, SeenStats]]
     ):
         start = self._get_start_from_seen_stats(seen_stats)
-        unhandled = {}
-
-        cache_keys = []
-        for item in item_list:
-            cache_keys.append(f"group-mechanism-handled:{item.id}")
-
+        cache_keys = [f"group-mechanism-handled:{item.id}" for item in item_list]
         cache_data = cache.get_many(cache_keys)
-        for item, cache_key in zip(item_list, cache_keys):
-            unhandled[item.id] = cache_data.get(cache_key)
+        unhandled = {
+            item.id: cache_data.get(cache_key)
+            for item, cache_key in zip(item_list, cache_keys)
+        }
 
         filter_keys = {}
         for item in item_list:
@@ -572,15 +565,17 @@ class GroupSerializerBase(Serializer, ABC):
                 tables=["sentry_grouplink"],
                 where=[
                     "sentry_grouplink.linked_id = sentry_commit.id",
-                    "sentry_grouplink.group_id IN ({})".format(
-                        ", ".join(str(i.id) for i in resolved_groups)
-                    ),
+                    f'sentry_grouplink.group_id IN ({", ".join(str(i.id) for i in resolved_groups)})',
                     "sentry_grouplink.linked_type = %s",
                     "sentry_grouplink.relationship = %s",
                 ],
-                params=[int(GroupLink.LinkedType.commit), int(GroupLink.Relationship.resolves)],
+                params=[
+                    int(GroupLink.LinkedType.commit),
+                    int(GroupLink.Relationship.resolves),
+                ],
             )
         )
+
         _commit_resolutions = {
             i.group_id: d for i, d in zip(commit_results, serialize(commit_results, user))
         }
@@ -635,9 +630,7 @@ class GroupSerializerBase(Serializer, ABC):
     ) -> Sequence[Any]:
         from sentry.plugins.base import plugins
 
-        annotations_for_group = []
-        annotations_for_group.extend(current_annotations)
-
+        annotations_for_group = list(current_annotations)
         # add the annotations for plugins
         # note that the model GroupMeta(where all the information is stored) is already cached at the start of
         # `get_attrs`, so these for loops doesn't make a bunch of queries
@@ -667,11 +660,10 @@ class GroupSerializerBase(Serializer, ABC):
             request
             and getattr(request.user, "is_sentry_app", False)
             and isinstance(request.auth, ApiToken)
+        ) and SentryAppInstallationToken.objects.has_organization_access(
+            request.auth, organization_id
         ):
-            if SentryAppInstallationToken.objects.has_organization_access(
-                request.auth, organization_id
-            ):
-                return True
+            return True
 
         return user.is_authenticated and user.get_orgs().filter(id=organization_id).exists()
 
@@ -835,13 +827,19 @@ class GroupSerializerSnuba(GroupSerializerBase):
         # should try and encapsulate this logic, but if you're changing this, change it
         # there as well.
         self.start = None
-        start_params = [_f for _f in [start, get_search_filter(search_filters, "date", ">")] if _f]
-        if start_params:
+        if start_params := [
+            _f
+            for _f in [start, get_search_filter(search_filters, "date", ">")]
+            if _f
+        ]:
             self.start = max(_f for _f in start_params if _f)
 
         self.end = None
-        end_params = [_f for _f in [end, get_search_filter(search_filters, "date", "<")] if _f]
-        if end_params:
+        if end_params := [
+            _f
+            for _f in [end, get_search_filter(search_filters, "date", "<")]
+            if _f
+        ]:
             self.end = min(end_params)
 
         self.conditions = (

@@ -210,7 +210,6 @@ class OrganizationDynamicSamplingSDKVersionsEndpoint(OrganizationEndpoint):
             sdk_name = (
                 row["sdk.name"] or ""
             )  # Defaulting to string just to be sure because we are later using startswith
-            sdk_version = row["sdk.version"]
             # Filter 1: Discard any sdk name that accounts less than or equal to the value
             # `SDK_NAME_FILTER_THRESHOLD` of total count per project
             # Filter 2: Discard any sdk version that accounts less than or equal to
@@ -221,6 +220,7 @@ class OrganizationDynamicSamplingSDKVersionsEndpoint(OrganizationEndpoint):
                 and row["count()"]
                 > SDK_VERSION_FILTER_THRESHOLD * total_sdk_name_count_per_project[project][sdk_name]
             ):
+                sdk_version = row["sdk.version"]
                 project_to_sdk_version_to_info_dict.setdefault(project, {})[sdk_version] = {
                     "project": project,
                     "latestSDKName": sdk_name,

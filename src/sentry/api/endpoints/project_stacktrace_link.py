@@ -74,16 +74,16 @@ class ProjectStacktraceLinkEndpoint(ProjectEndpoint):
             frame["module"] = module
         if package:
             frame["package"] = package
-        result = {"config": None, "sourceUrl": None}
-
         integrations = Integration.objects.filter(organizations=project.organization_id)
-        # TODO(meredith): should use get_provider.has_feature() instead once this is
-        # no longer feature gated and is added as an IntegrationFeature
-        result["integrations"] = [
-            serialize(i, request.user)
-            for i in integrations
-            if i.has_feature(IntegrationFeatures.STACKTRACE_LINK)
-        ]
+        result = {
+            "config": None,
+            "sourceUrl": None,
+            "integrations": [
+                serialize(i, request.user)
+                for i in integrations
+                if i.has_feature(IntegrationFeatures.STACKTRACE_LINK)
+            ],
+        }
 
         # xxx(meredith): if there are ever any changes to this query, make
         # sure that we are still ordering by `id` because we want to make sure
@@ -112,13 +112,13 @@ class ProjectStacktraceLinkEndpoint(ProjectEndpoint):
 
                 if not link and frame:
                     frame["filename"] = filepath
-                    munged_frames = munged_filename_and_frames(
+                    if munged_frames := munged_filename_and_frames(
                         platform, [frame], "munged_filename", sdk_name=sdk_name
-                    )
-                    if munged_frames:
+                    ):
                         munged_frame: Mapping[str, Any] = munged_frames[1][0]
-                        munged_filename = str(munged_frame.get("munged_filename"))
-                        if munged_filename:
+                        if munged_filename := str(
+                            munged_frame.get("munged_filename")
+                        ):
                             if not filepath.startswith(
                                 config.stack_root
                             ) and not munged_filename.startswith(config.stack_root):

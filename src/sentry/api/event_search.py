@@ -200,7 +200,7 @@ def translate_wildcard(pat: str) -> str:
     res = ""
     while i < n:
         c = pat[i]
-        i = i + 1
+        i += 1
         # fnmatch.translate has no way to handle escaping metacharacters.
         # Applied this basic patch to handle it:
         # https://bugs.python.org/file27570/issue8402.1.patch
@@ -213,7 +213,7 @@ def translate_wildcard(pat: str) -> str:
             res += re.escape(c)
         else:
             res += c
-    return "^" + res + "$"
+    return f"^{res}$"
 
 
 def translate_escape_sequences(string: str) -> str:
@@ -226,7 +226,7 @@ def translate_escape_sequences(string: str) -> str:
     res = ""
     while i < n:
         c = string[i]
-        i = i + 1
+        i += 1
         if c == "\\" and i < n:
             d = string[i]
             if d == "*":
@@ -357,9 +357,11 @@ class SearchValue(NamedTuple):
         return self.raw_value
 
     def is_wildcard(self) -> bool:
-        if not isinstance(self.raw_value, str):
-            return False
-        return bool(WILDCARD_CHARS.search(self.raw_value))
+        return (
+            bool(WILDCARD_CHARS.search(self.raw_value))
+            if isinstance(self.raw_value, str)
+            else False
+        )
 
     def is_event_id(self) -> bool:
         """Return whether the current value is a valid event id
@@ -368,18 +370,22 @@ class SearchValue(NamedTuple):
         """
         if isinstance(self.raw_value, list):
             return all(isinstance(value, str) and is_event_id(value) for value in self.raw_value)
-        if not isinstance(self.raw_value, str):
-            return False
-        return is_event_id(self.raw_value) or self.raw_value == ""
+        return (
+            is_event_id(self.raw_value) or self.raw_value == ""
+            if isinstance(self.raw_value, str)
+            else False
+        )
 
     def is_span_id(self) -> bool:
         """Return whether the current value is a valid span id
 
         Empty strings are valid, so that it can be used for has:trace.span queries
         """
-        if not isinstance(self.raw_value, str):
-            return False
-        return is_span_id(self.raw_value) or self.raw_value == ""
+        return (
+            is_span_id(self.raw_value) or self.raw_value == ""
+            if isinstance(self.raw_value, str)
+            else False
+        )
 
 
 class SearchFilter(NamedTuple):
@@ -552,9 +558,13 @@ class SearchVisitor(NodeVisitor):
         return node.text.strip(" ") or None
 
     def visit_free_text(self, node, children):
-        if not children[0]:
-            return None
-        return SearchFilter(SearchKey(self.config.free_text_key), "=", SearchValue(children[0]))
+        return (
+            SearchFilter(
+                SearchKey(self.config.free_text_key), "=", SearchValue(children[0])
+            )
+            if children[0]
+            else None
+        )
 
     def visit_paren_group(self, node, children):
         if not self.config.allow_boolean:
@@ -564,10 +574,7 @@ class SearchVisitor(NodeVisitor):
 
         children = remove_space(remove_optional_nodes(flatten(children)))
         children = flatten(children[1])
-        if len(children) == 0:
-            return node.text
-
-        return ParenExpression(children)
+        return node.text if len(children) == 0 else ParenExpression(children)
 
     # --- Start of filter visitors
 
@@ -717,7 +724,9 @@ class SearchVisitor(NodeVisitor):
             return SearchFilter(search_key, "=", search_value)
 
         search_value = SearchValue(search_value.text)
-        return self._handle_basic_filter(search_key, "=" if not negated else "!=", search_value)
+        return self._handle_basic_filter(
+            search_key, "!=" if negated else "=", search_value
+        )
 
     def visit_numeric_in_filter(self, node, children):
         (negation, search_key, _, search_value) = children

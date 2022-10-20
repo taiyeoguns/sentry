@@ -15,7 +15,7 @@ class OrganizationConfigIntegrationsEndpoint(OrganizationEndpoint):
             if not provider.requires_feature_flag:
                 return True
             provider_key = provider.key.replace("_", "-")
-            feature_flag_name = "organizations:integrations-%s" % provider_key
+            feature_flag_name = f"organizations:integrations-{provider_key}"
             return features.has(feature_flag_name, organization, actor=request.user)
 
         providers = list(filter(is_provider_enabled, list(integrations.all())))
@@ -29,7 +29,8 @@ class OrganizationConfigIntegrationsEndpoint(OrganizationEndpoint):
         if "provider_key" in request.GET:
             serialized = [d for d in serialized if d["key"] == request.GET["provider_key"]]
 
-        if not serialized:
-            return Response({"detail": "Providers do not exist"}, status=404)
-
-        return Response({"providers": serialized})
+        return (
+            Response({"providers": serialized})
+            if serialized
+            else Response({"detail": "Providers do not exist"}, status=404)
+        )

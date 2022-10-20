@@ -74,11 +74,11 @@ class SystemOptionsEndpoint(Endpoint):
 
             try:
                 with transaction.atomic():
-                    if not (option.flags & options.FLAG_ALLOW_EMPTY) and not v:
-                        options.delete(k)
-                    else:
+                    if option.flags & options.FLAG_ALLOW_EMPTY or v:
                         options.set(k, v)
 
+                    else:
+                        options.delete(k)
                     logger.info(
                         "options.update",
                         extra={

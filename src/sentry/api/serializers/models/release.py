@@ -29,16 +29,15 @@ def expose_version_info(info):
         return None
     version = {"raw": info["version_raw"]}
     if info["version_parsed"]:
-        version.update(
-            {
-                "major": info["version_parsed"]["major"],
-                "minor": info["version_parsed"]["minor"],
-                "patch": info["version_parsed"]["patch"],
-                "pre": info["version_parsed"]["pre"],
-                "buildCode": info["version_parsed"]["build_code"],
-                "components": info["version_parsed"]["components"],
-            }
-        )
+        version |= {
+            "major": info["version_parsed"]["major"],
+            "minor": info["version_parsed"]["minor"],
+            "patch": info["version_parsed"]["patch"],
+            "pre": info["version_parsed"]["pre"],
+            "buildCode": info["version_parsed"]["build_code"],
+            "components": info["version_parsed"]["components"],
+        }
+
     return {
         "package": info["package"],
         "version": version,
@@ -76,10 +75,12 @@ def get_users_for_authors(organization_id, authors, user=None) -> Mapping[str, U
     """
     results = {}
 
-    fetched = cache.get_many(
-        [_user_to_author_cache_key(organization_id, author) for author in authors]
-    )
-    if fetched:
+    if fetched := cache.get_many(
+        [
+            _user_to_author_cache_key(organization_id, author)
+            for author in authors
+        ]
+    ):
         missed = []
         for author in authors:
             fetched_user = fetched.get(_user_to_author_cache_key(organization_id, author))
@@ -111,10 +112,7 @@ def get_users_for_authors(organization_id, authors, user=None) -> Mapping[str, U
             # force emails to lower case so we can do case insensitive matching
             lower_email = email.email.lower()
             if lower_email not in users_by_email:
-                user = users_by_id.get(str(email.user_id), None)
-                # user can be None if there's a user associated
-                # with user_email in separate organization
-                if user:
+                if user := users_by_id.get(str(email.user_id), None):
                     users_by_email[lower_email] = user
         to_cache = {}
         for author in missed:
@@ -165,8 +163,7 @@ class ReleaseSerializer(Serializer):
         else:
             users_by_author = {}
 
-        commit_ids = {o.last_commit_id for o in item_list if o.last_commit_id}
-        if commit_ids:
+        if commit_ids := {o.last_commit_id for o in item_list if o.last_commit_id}:
             commit_list = list(Commit.objects.filter(id__in=commit_ids).select_related("author"))
             commits = {c.id: d for c, d in zip(commit_list, serialize(commit_list, user))}
         else:
@@ -201,17 +198,16 @@ class ReleaseSerializer(Serializer):
             ...
         }
         """
-        deploy_ids = {o.last_deploy_id for o in item_list if o.last_deploy_id}
-        if deploy_ids:
+        if deploy_ids := {o.last_deploy_id for o in item_list if o.last_deploy_id}:
             deploy_list = list(Deploy.objects.filter(id__in=deploy_ids))
             deploys = {d.id: c for d, c in zip(deploy_list, serialize(deploy_list, user))}
         else:
             deploys = {}
 
-        result = {}
-        for item in item_list:
-            result[item] = {"last_deploy": deploys.get(item.last_deploy_id)}
-        return result
+        return {
+            item: {"last_deploy": deploys.get(item.last_deploy_id)}
+            for item in item_list
+        }
 
     def __get_project_id_list(self, item_list):
         project_ids = set()
@@ -223,16 +219,17 @@ class ReleaseSerializer(Serializer):
             else:
                 need_fallback = True
 
-        if not need_fallback:
-            return sorted(project_ids), True
-
         return (
-            list(
-                ReleaseProject.objects.filter(release__in=item_list)
-                .values_list("project_id", flat=True)
-                .distinct()
-            ),
-            False,
+            (
+                list(
+                    ReleaseProject.objects.filter(release__in=item_list)
+                    .values_list("project_id", flat=True)
+                    .distinct()
+                ),
+                False,
+            )
+            if need_fallback
+            else (sorted(project_ids), True)
         )
 
     def __get_release_data_no_environment(self, project, item_list):
@@ -327,14 +324,10 @@ class ReleaseSerializer(Serializer):
         environment = kwargs.get("environment")
         environments = kwargs.get("environments")
         if not environments:
-            if environment:
-                environments = [environment.name]
-            else:
-                environments = None
-
+            environments = [environment.name] if environment else None
         self.with_adoption_stages = kwargs.get("with_adoption_stages", False)
         with_health_data = kwargs.get("with_health_data", False)
-        health_stat = kwargs.get("health_stat", None)
+        health_stat = kwargs.get("health_stat")
         health_stats_period = kwargs.get("health_stats_period")
         summary_stats_period = kwargs.get("summary_stats_period")
         no_snuba = kwargs.get("no_snuba")
@@ -443,13 +436,9 @@ class ReleaseSerializer(Serializer):
                 "last_seen": last_seen.get(item.version),
             }
             if adoption_stages:
-                p.update(
-                    {
-                        "adoption_stages": adoption_stages.get(item.version),
-                    }
-                )
+                p["adoption_stages"] = adoption_stages.get(item.version)
 
-            p.update(release_metadata_attrs[item])
+            p |= release_metadata_attrs[item]
             p.update(deploy_metadata_attrs[item])
 
             result[item] = p
@@ -457,27 +446,29 @@ class ReleaseSerializer(Serializer):
 
     def serialize(self, obj, attrs, user, **kwargs):
         def expose_health_data(data):
-            if not data:
-                return None
-            return {
-                "durationP50": data["duration_p50"],
-                "durationP90": data["duration_p90"],
-                "crashFreeUsers": data["crash_free_users"],
-                "crashFreeSessions": data["crash_free_sessions"],
-                "sessionsCrashed": data["sessions_crashed"],
-                "sessionsErrored": data["sessions_errored"],
-                "totalUsers": data["total_users"],
-                "totalUsers24h": data["total_users_24h"],
-                "totalProjectUsers24h": data["total_project_users_24h"],
-                "totalSessions": data["total_sessions"],
-                "totalSessions24h": data["total_sessions_24h"],
-                "totalProjectSessions24h": data["total_project_sessions_24h"],
-                "adoption": data["adoption"],
-                "sessionsAdoption": data["sessions_adoption"],
-                "stats": data.get("stats"),
-                # XXX: legacy key, should be removed later.
-                "hasHealthData": data["has_health_data"],
-            }
+            return (
+                {
+                    "durationP50": data["duration_p50"],
+                    "durationP90": data["duration_p90"],
+                    "crashFreeUsers": data["crash_free_users"],
+                    "crashFreeSessions": data["crash_free_sessions"],
+                    "sessionsCrashed": data["sessions_crashed"],
+                    "sessionsErrored": data["sessions_errored"],
+                    "totalUsers": data["total_users"],
+                    "totalUsers24h": data["total_users_24h"],
+                    "totalProjectUsers24h": data["total_project_users_24h"],
+                    "totalSessions": data["total_sessions"],
+                    "totalSessions24h": data["total_sessions_24h"],
+                    "totalProjectSessions24h": data["total_project_sessions_24h"],
+                    "adoption": data["adoption"],
+                    "sessionsAdoption": data["sessions_adoption"],
+                    "stats": data.get("stats"),
+                    # XXX: legacy key, should be removed later.
+                    "hasHealthData": data["has_health_data"],
+                }
+                if data
+                else None
+            )
 
         def expose_project(project):
             rv = {
@@ -536,9 +527,5 @@ class ReleaseSerializer(Serializer):
             ),
         }
         if self.with_adoption_stages:
-            d.update(
-                {
-                    "adoptionStages": attrs.get("adoption_stages"),
-                }
-            )
+            d["adoptionStages"] = attrs.get("adoption_stages")
         return d

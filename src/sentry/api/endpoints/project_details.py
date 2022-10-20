@@ -59,8 +59,7 @@ def clean_newline_inputs(value, case_insensitive=True):
     for v in value.split("\n"):
         if case_insensitive:
             v = v.lower()
-        v = v.strip()
-        if v:
+        if v := v.strip():
             result.append(v)
     return result
 
@@ -150,11 +149,10 @@ class DynamicSamplingSerializer(serializers.Serializer):
                     # a new or unknown rule give it a new id
                     rule["id"] = next_id
                     next_id += 1
-                else:
-                    if original_rule != rule:
-                        # something changed in this rule, give it a new id
-                        rule["id"] = next_id
-                        next_id += 1
+                elif original_rule != rule:
+                    # something changed in this rule, give it a new id
+                    rule["id"] = next_id
+                    next_id += 1
 
         raw_dynamic_sampling["next_id"] = next_id
         return raw_dynamic_sampling
@@ -288,12 +286,12 @@ class ProjectAdminSerializer(ProjectMemberSerializer):
         return data
 
     def validate_allowedDomains(self, value):
-        value = list(filter(bool, value))
-        if len(value) == 0:
+        if value := list(filter(bool, value)):
+            return value
+        else:
             raise serializers.ValidationError(
                 "Empty value will block all requests, use * to accept from all domains"
             )
-        return value
 
     def validate_slug(self, slug):
         if slug in RESERVED_PROJECT_SLUGS:
@@ -306,8 +304,9 @@ class ProjectAdminSerializer(ProjectMemberSerializer):
         )
         if other is not None:
             raise serializers.ValidationError(
-                "Another project (%s) is already using that slug" % other.name
+                f"Another project ({other.name}) is already using that slug"
             )
+
         return slug
 
     def validate_relayPiiConfig(self, value):
@@ -322,12 +321,12 @@ class ProjectAdminSerializer(ProjectMemberSerializer):
 
         organization = self.context["project"].organization
         request = self.context["request"]
-        has_sources = features.has("organizations:symbol-sources", organization, actor=request.user)
-
-        if not has_sources:
+        if has_sources := features.has(
+            "organizations:symbol-sources", organization, actor=request.user
+        ):
+            return value
+        else:
             raise serializers.ValidationError("Organization is not allowed to set symbol sources")
-
-        return value
 
     def validate_symbolSources(self, sources_json):
         if not sources_json:
@@ -478,8 +477,7 @@ class ProjectDetailsEndpoint(ProjectEndpoint):
     def _get_unresolved_count(self, project):
         queryset = Group.objects.filter(status=GroupStatus.UNRESOLVED, project=project)
 
-        resolve_age = project.get_option("sentry:resolve_age", None)
-        if resolve_age:
+        if resolve_age := project.get_option("sentry:resolve_age", None):
             queryset = queryset.filter(
                 last_seen__gte=timezone.now() - timedelta(hours=int(resolve_age))
             )

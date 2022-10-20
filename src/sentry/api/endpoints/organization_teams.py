@@ -86,33 +86,32 @@ class OrganizationTeamsEndpoint(OrganizationEndpoint):
             .select_related("organization")  # Used in TeamSerializer
         )
 
-        query = request.GET.get("query")
-
-        if query:
+        if query := request.GET.get("query"):
             tokens = tokenize_query(query)
             for key, value in tokens.items():
                 if key == "hasExternalTeams":
                     has_external_teams = "true" in value
-                    if has_external_teams:
-                        queryset = queryset.filter(
+                    queryset = (
+                        queryset.filter(
                             actor_id__in=ExternalActor.objects.filter(
                                 organization=organization
                             ).values_list("actor_id")
                         )
-                    else:
-                        queryset = queryset.exclude(
+                        if has_external_teams
+                        else queryset.exclude(
                             actor_id__in=ExternalActor.objects.filter(
                                 organization=organization
                             ).values_list("actor_id")
                         )
+                    )
 
+                elif key == "id":
+                    queryset = queryset.filter(id__in=value)
                 elif key == "query":
                     value = " ".join(value)
                     queryset = queryset.filter(Q(name__icontains=value) | Q(slug__icontains=value))
                 elif key == "slug":
                     queryset = queryset.filter(slug__in=value)
-                elif key == "id":
-                    queryset = queryset.filter(id__in=value)
                 else:
                     queryset = queryset.none()
 

@@ -268,17 +268,19 @@ def _value_matches(
 
 def print_conditions(killswitch_name: str, raw_option_value: LegacyKillswitchConfig) -> str:
     option_value = normalize_value(killswitch_name, raw_option_value)
-    if not option_value:
-        return "<disabled entirely>"
-
-    return "DROP DATA WHERE\n  " + " OR\n  ".join(
-        "("
-        + " AND ".join(
-            f"{field} = {matching_value if matching_value is not None else '*'}"
-            for field, matching_value in condition.items()
+    return (
+        "DROP DATA WHERE\n  "
+        + " OR\n  ".join(
+            "("
+            + " AND ".join(
+                f"{field} = {matching_value if matching_value is not None else '*'}"
+                for field, matching_value in condition.items()
+            )
+            + ")"
+            for condition in option_value
         )
-        + ")"
-        for condition in option_value
+        if option_value
+        else "<disabled entirely>"
     )
 
 

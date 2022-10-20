@@ -16,12 +16,11 @@ class ActivitySerializer(Serializer):
         # TODO(dcramer); assert on relations
         users = {d["id"]: d for d in serialize({i.user for i in item_list if i.user_id}, user)}
 
-        commit_ids = {
+        if commit_ids := {
             i.data["commit"]
             for i in item_list
             if i.type == ActivityType.SET_RESOLVED_IN_COMMIT.value
-        }
-        if commit_ids:
+        }:
             commit_list = list(Commit.objects.filter(id__in=commit_ids))
             commits_by_id = {
                 c.id: d
@@ -38,12 +37,11 @@ class ActivitySerializer(Serializer):
         else:
             commits = {}
 
-        pull_request_ids = {
+        if pull_request_ids := {
             i.data["pull_request"]
             for i in item_list
             if i.type == ActivityType.SET_RESOLVED_IN_PULL_REQUEST.value
-        }
-        if pull_request_ids:
+        }:
             pull_request_list = list(PullRequest.objects.filter(id__in=pull_request_ids))
             pull_requests_by_id = {
                 c.id: d for c, d in zip(pull_request_list, serialize(pull_request_list, user))

@@ -201,12 +201,10 @@ class StreamGroupSerializerSnuba(GroupSerializerSnuba, GroupStatsMixin):
     ) -> MutableMapping[Group, MutableMapping[str, Any]]:
         if not self._collapse("base"):
             attrs = super().get_attrs(item_list, user)
+        elif seen_stats := self._get_seen_stats(item_list, user):
+            attrs = {item: seen_stats.get(item, {}) for item in item_list}
         else:
-            seen_stats = self._get_seen_stats(item_list, user)
-            if seen_stats:
-                attrs = {item: seen_stats.get(item, {}) for item in item_list}
-            else:
-                attrs = {item: {} for item in item_list}
+            attrs = {item: {} for item in item_list}
 
         if self.stats_period and not self._collapse("stats"):
             partial_get_stats = functools.partial(
@@ -264,7 +262,7 @@ class StreamGroupSerializerSnuba(GroupSerializerSnuba, GroupStatsMixin):
                         cache.set(cache_key, count, 3600)
 
                     for item in missed_items:
-                        if item.project_id in results.keys():
+                        if item.project_id in results:
                             attrs[item].update(
                                 {
                                     "sessionCount": results[item.project_id],
@@ -295,7 +293,7 @@ class StreamGroupSerializerSnuba(GroupSerializerSnuba, GroupStatsMixin):
                 "id": str(obj.id),
             }
             if "times_seen" in attrs:
-                result.update(self._convert_seen_stats(attrs))
+                result |= self._convert_seen_stats(attrs)
 
         if not self._collapse("stats"):
             if self.stats_period:
@@ -346,7 +344,7 @@ class StreamGroupSerializerSnuba(GroupSerializerSnuba, GroupStatsMixin):
             **query_params,
         )
         if error_issue_ids:
-            results.update(get_range(model=snuba_tsdb.models.group, keys=error_issue_ids))
+            results |= get_range(model=snuba_tsdb.models.group, keys=error_issue_ids)
         if perf_issue_ids:
             results.update(
                 get_range(model=snuba_tsdb.models.group_performance, keys=perf_issue_ids)
@@ -392,19 +390,18 @@ class StreamGroupSerializerSnuba(GroupSerializerSnuba, GroupStatsMixin):
             else None
         )
         lifetime_result = (
-            (
-                self._parse_seen_stats_results(
-                    partial_execute_seen_stats_query(start=None, end=None),
-                    error_issue_list,
-                    False,
-                    self.environment_ids,
-                )
-                if self.start or self.end
-                else time_range_result
+            None
+            if self._collapse("lifetime")
+            else self._parse_seen_stats_results(
+                partial_execute_seen_stats_query(start=None, end=None),
+                error_issue_list,
+                False,
+                self.environment_ids,
             )
-            if not self._collapse("lifetime")
-            else None
+            if self.start or self.end
+            else time_range_result
         )
+
 
         for item in error_issue_list:
             time_range_result[item].update(
@@ -435,5 +432,4 @@ class StreamGroupSerializerSnuba(GroupSerializerSnuba, GroupStatsMixin):
         start_key = start_key.strftime("%m/%d/%Y, %H:%M:%S") if start_key != "" else ""
         end_key = end_key.strftime("%m/%d/%Y, %H:%M:%S") if end_key != "" else ""
         key_hash = hash_values([project_id, start_key, end_key, env_key])
-        session_cache_key = f"w-s:{key_hash}"
-        return session_cache_key
+        return f"w-s:{key_hash}"

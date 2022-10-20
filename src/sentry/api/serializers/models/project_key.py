@@ -10,7 +10,7 @@ from sentry.models import ProjectKey
 class ProjectKeySerializer(Serializer):
     def serialize(self, obj, attrs, user):
         name = obj.label or obj.public_key[:14]
-        d = {
+        return {
             "id": obj.public_key,
             "name": name,
             # label is here for compatibility
@@ -19,7 +19,10 @@ class ProjectKeySerializer(Serializer):
             "secret": obj.secret_key,
             "projectId": obj.project_id,
             "isActive": obj.is_active,
-            "rateLimit": {"window": obj.rate_limit_window, "count": obj.rate_limit_count}
+            "rateLimit": {
+                "window": obj.rate_limit_window,
+                "count": obj.rate_limit_count,
+            }
             if (obj.rate_limit_window and obj.rate_limit_count)
             else None,
             "dsn": {
@@ -35,4 +38,3 @@ class ProjectKeySerializer(Serializer):
             "browserSdk": {"choices": get_browser_sdk_version_choices()},
             "dateCreated": obj.date_added,
         }
-        return d

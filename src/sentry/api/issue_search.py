@@ -70,9 +70,7 @@ def convert_release_value(value, projects, user, environments) -> Union[str, Lis
     for version in value:
         releases.update(parse_release(version, projects, environments))
     releases = list(releases)
-    if len(releases) == 1:
-        return releases[0]
-    return releases
+    return releases[0] if len(releases) == 1 else releases
 
 
 def convert_first_release_value(value, projects, user, environments) -> List[str]:
@@ -99,10 +97,12 @@ def convert_category_value(value, projects, user, environments):
     if features.has("organizations:performance-issues", projects[0].organization):
         results = []
         for category in value:
-            group_category = getattr(GroupCategory, category.upper(), None)
-            if not group_category:
+            if group_category := getattr(
+                GroupCategory, category.upper(), None
+            ):
+                results.extend([type.value for type in GROUP_CATEGORY_TO_TYPES.get(group_category, [])])
+            else:
                 raise InvalidSearchQuery(f"Invalid category value of '{category}'")
-            results.extend([type.value for type in GROUP_CATEGORY_TO_TYPES.get(group_category, [])])
         return results
 
 
@@ -111,10 +111,10 @@ def convert_type_value(value, projects, user, environments):
     if features.has("organizations:performance-issues", projects[0].organization):
         results = []
         for type in value:
-            group_type = getattr(GroupType, type.upper(), None)
-            if not group_type:
+            if group_type := getattr(GroupType, type.upper(), None):
+                results.append(group_type.value)
+            else:
                 raise InvalidSearchQuery(f"Invalid type value of '{type}'")
-            results.append(group_type.value)
         return results
 
 
@@ -143,13 +143,17 @@ def convert_query_values(search_filters, projects, user, environments):
     """
 
     def convert_search_filter(search_filter, organization):
-        if search_filter.key.name == "empty_stacktrace.js_console":
-            if not features.has(
-                "organizations:javascript-console-error-tag", organization, actor=None
-            ):
-                raise InvalidSearchQuery(
-                    "The empty_stacktrace.js_console filter is not supported for this organization"
-                )
+        if (
+            search_filter.key.name == "empty_stacktrace.js_console"
+            and not features.has(
+                "organizations:javascript-console-error-tag",
+                organization,
+                actor=None,
+            )
+        ):
+            raise InvalidSearchQuery(
+                "The empty_stacktrace.js_console filter is not supported for this organization"
+            )
 
         if search_filter.key.name in value_converters:
             converter = value_converters[search_filter.key.name]

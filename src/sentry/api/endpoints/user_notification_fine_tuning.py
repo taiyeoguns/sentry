@@ -30,9 +30,10 @@ class UserNotificationFineTuningEndpoint(UserEndpoint):
             notification_type = FineTuningAPIKey(notification_type)
         except ValueError:
             return Response(
-                {"detail": "Unknown notification type: %s." % notification_type},
+                {"detail": f"Unknown notification type: {notification_type}."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
 
         notifications = UserNotificationsSerializer()
         return Response(
@@ -71,9 +72,10 @@ class UserNotificationFineTuningEndpoint(UserEndpoint):
             notification_type = FineTuningAPIKey(notification_type)
         except ValueError:
             return Response(
-                {"detail": "Unknown notification type: %s." % notification_type},
+                {"detail": f"Unknown notification type: {notification_type}."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
 
         if notification_type == FineTuningAPIKey.REPORTS:
             return self._handle_put_reports(user, request.data)

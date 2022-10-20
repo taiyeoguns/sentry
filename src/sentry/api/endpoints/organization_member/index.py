@@ -52,16 +52,19 @@ class OrganizationMemberSerializer(serializers.Serializer):
         )
 
         if queryset.filter(invite_status=InviteStatus.APPROVED.value).exists():
-            raise MemberConflictValidationError("The user %s is already a member" % email)
+            raise MemberConflictValidationError(f"The user {email} is already a member")
 
-        if not self.context.get("allow_existing_invite_request"):
-            if queryset.filter(
+        if (
+            not self.context.get("allow_existing_invite_request")
+            and queryset.filter(
                 Q(invite_status=InviteStatus.REQUESTED_TO_BE_INVITED.value)
                 | Q(invite_status=InviteStatus.REQUESTED_TO_JOIN.value)
-            ).exists():
-                raise MemberConflictValidationError(
-                    "There is an existing invite request for %s" % email
-                )
+            ).exists()
+        ):
+            raise MemberConflictValidationError(
+                f"There is an existing invite request for {email}"
+            )
+
         return email
 
     def validate_teams(self, teams):
@@ -98,8 +101,7 @@ class OrganizationMemberIndexEndpoint(OrganizationEndpoint):
             .order_by("email", "user__email")
         )
 
-        query = request.GET.get("query")
-        if query:
+        if query := request.GET.get("query"):
             tokens = tokenize_query(query)
             for key, value in tokens.items():
                 if key == "email":
@@ -108,24 +110,6 @@ class OrganizationMemberIndexEndpoint(OrganizationEndpoint):
                         | Q(user__email__in=value)
                         | Q(user__emails__email__in=value)
                     )
-
-                elif key == "scope":
-                    queryset = queryset.filter(role__in=[r.id for r in roles.with_any_scope(value)])
-
-                elif key == "role":
-                    queryset = queryset.filter(role__in=value)
-
-                elif key == "isInvited":
-                    isInvited = "true" in value
-                    queryset = queryset.filter(user__isnull=isInvited)
-
-                elif key == "ssoLinked":
-                    ssoFlag = OrganizationMember.flags["sso:linked"]
-                    ssoLinked = "true" in value
-                    if ssoLinked:
-                        queryset = queryset.filter(flags=F("flags").bitor(ssoFlag))
-                    else:
-                        queryset = queryset.filter(flags=F("flags").bitand(~ssoFlag))
 
                 elif key == "has2fa":
                     has2fa = "true" in value
@@ -138,18 +122,23 @@ class OrganizationMemberIndexEndpoint(OrganizationEndpoint):
                         queryset = queryset.filter(user__authenticator__isnull=True)
                 elif key == "hasExternalUsers":
                     hasExternalUsers = "true" in value
-                    if hasExternalUsers:
-                        queryset = queryset.filter(
+                    queryset = (
+                        queryset.filter(
                             user__actor_id__in=ExternalActor.objects.filter(
                                 organization=organization
                             ).values_list("actor_id")
                         )
-                    else:
-                        queryset = queryset.exclude(
+                        if hasExternalUsers
+                        else queryset.exclude(
                             user__actor_id__in=ExternalActor.objects.filter(
                                 organization=organization
                             ).values_list("actor_id")
                         )
+                    )
+
+                elif key == "isInvited":
+                    isInvited = "true" in value
+                    queryset = queryset.filter(user__isnull=isInvited)
 
                 elif key == "query":
                     value = " ".join(value)
@@ -158,6 +147,21 @@ class OrganizationMemberIndexEndpoint(OrganizationEndpoint):
                         | Q(user__email__icontains=value)
                         | Q(user__name__icontains=value)
                     )
+                elif key == "role":
+                    queryset = queryset.filter(role__in=value)
+
+                elif key == "scope":
+                    queryset = queryset.filter(role__in=[r.id for r in roles.with_any_scope(value)])
+
+                elif key == "ssoLinked":
+                    ssoLinked = "true" in value
+                    ssoFlag = OrganizationMember.flags["sso:linked"]
+                    queryset = (
+                        queryset.filter(flags=F("flags").bitor(ssoFlag))
+                        if ssoLinked
+                        else queryset.filter(flags=F("flags").bitand(~ssoFlag))
+                    )
+
                 else:
                     queryset = queryset.none()
 

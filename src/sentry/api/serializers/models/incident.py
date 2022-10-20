@@ -37,10 +37,13 @@ class IncidentSerializer(Serializer):
             )
         }
 
-        results = {}
-        for incident in item_list:
-            results[incident] = {"projects": incident_projects.get(incident.id, [])}
-            results[incident]["alert_rule"] = alert_rules.get(str(incident.alert_rule.id))
+        results = {
+            incident: {
+                "projects": incident_projects.get(incident.id, []),
+                "alert_rule": alert_rules.get(str(incident.alert_rule.id)),
+            }
+            for incident in item_list
+        }
 
         if "seen_by" in self.expand:
             incident_seen_list = list(

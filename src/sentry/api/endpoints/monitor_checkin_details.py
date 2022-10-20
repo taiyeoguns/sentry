@@ -71,7 +71,7 @@ class MonitorCheckInDetailsEndpoint(Endpoint):
 
         request._request.organization = project.organization
 
-        kwargs.update({"checkin": checkin, "monitor": monitor, "project": project})
+        kwargs |= {"checkin": checkin, "monitor": monitor, "project": project}
         return (args, kwargs)
 
     def get(self, request: Request, project, monitor, checkin) -> Response:

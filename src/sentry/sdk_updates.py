@@ -98,7 +98,7 @@ class UpdateSDKSuggestion(Suggestion):
 
         new_sdk_version = self.new_sdk_version
         if self.ignore_patch_version:
-            new_sdk_version = ".".join(v for v in new_sdk_version.split(".")[:2])
+            new_sdk_version = ".".join(new_sdk_version.split(".")[:2])
 
         try:
             has_newer_version = Version(old_state.sdk_version) < Version(new_sdk_version)
@@ -351,10 +351,11 @@ def get_sdk_index():
 
     The cache is filled by a regular background task (see sentry/tasks/release_registry)
     """
-    if not settings.SENTRY_RELEASE_REGISTRY_BASEURL:
-        return {}
-
-    return cache.get(SDK_INDEX_CACHE_KEY) or {}
+    return (
+        cache.get(SDK_INDEX_CACHE_KEY) or {}
+        if settings.SENTRY_RELEASE_REGISTRY_BASEURL
+        else {}
+    )
 
 
 def get_sdk_versions():
@@ -370,7 +371,7 @@ def get_sdk_versions():
 def get_sdk_urls():
     try:
         rv = dict(settings.SDK_URLS)
-        rv.update((key, info["main_docs_url"]) for (key, info) in get_sdk_index().items())
+        rv |= ((key, info["main_docs_url"]) for (key, info) in get_sdk_index().items())
         return rv
     except Exception:
         logger.exception("sentry-release-registry.sdk-urls")

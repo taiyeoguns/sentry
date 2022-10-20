@@ -111,11 +111,12 @@ class ProjectDynamicSamplingDistributionEndpoint(ProjectEndpoint):
             )
         ]
         snuba_query = snuba_query.set_select(snuba_query.select + extra_select)
-        data = raw_snql_query(
-            SnubaRequest(dataset=Dataset.Discover.value, app_id="default", query=snuba_query),
+        return raw_snql_query(
+            SnubaRequest(
+                dataset=Dataset.Discover.value, app_id="default", query=snuba_query
+            ),
             referrer=Referrer.DYNAMIC_SAMPLING_DISTRIBUTION_FETCH_PROJECT_STATS.value,
         )["data"]
-        return data
 
     def __get_transactions_count(self, project, query, sample_size, query_time_range):
         # Run query that gets total count of transactions with these conditions for the specified
@@ -263,11 +264,12 @@ class ProjectDynamicSamplingDistributionEndpoint(ProjectEndpoint):
             snuba_query.groupby + [Column("modulo_num"), Column("contexts.key")]
         )
 
-        data = raw_snql_query(
-            SnubaRequest(dataset=Dataset.Discover.value, app_id="default", query=snuba_query),
+        return raw_snql_query(
+            SnubaRequest(
+                dataset=Dataset.Discover.value, app_id="default", query=snuba_query
+            ),
             referrer=Referrer.DYNAMIC_SAMPLING_DISTRIBUTION_FETCH_TRANSACTIONS.value,
         )["data"]
-        return data
 
     def get(self, request: Request, project) -> Response:
         """
@@ -361,22 +363,21 @@ class ProjectDynamicSamplingDistributionEndpoint(ProjectEndpoint):
             )
 
             if root_projects_count >= 1:
-                parent_project_breakdown = []
                 # ToDo(): revisit this logic with count if necessary in the future
                 total_root_count = sum(
                     _project["root_count"]
                     for _project in projects_counts
                     if _project["root_count"] > 0
                 )
-                for _project in projects_counts:
-                    if _project["root_count"] > 0:
-                        parent_project_breakdown.append(
-                            {
-                                "project": _project["project"],
-                                "projectId": _project["project_id"],
-                                "percentage": _project["root_count"] / total_root_count,
-                            }
-                        )
+                parent_project_breakdown = [
+                    {
+                        "project": _project["project"],
+                        "projectId": _project["project_id"],
+                        "percentage": _project["root_count"] / total_root_count,
+                    }
+                    for _project in projects_counts
+                    if _project["root_count"] > 0
+                ]
 
             project_breakdown = []
 

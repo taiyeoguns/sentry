@@ -79,12 +79,13 @@ class OrganizationIndexEndpoint(Endpoint):
                 member_set__user=request.user,
                 status=OrganizationStatus.VISIBLE,
             )
-            org_results = []
-            for org in sorted(queryset, key=lambda x: x.name):
-                # O(N) query
-                org_results.append(
-                    {"organization": serialize(org), "singleOwner": org.has_single_owner()}
-                )
+            org_results = [
+                {
+                    "organization": serialize(org),
+                    "singleOwner": org.has_single_owner(),
+                }
+                for org in sorted(queryset, key=lambda x: x.name)
+            ]
 
             return Response(org_results)
 
@@ -93,11 +94,26 @@ class OrganizationIndexEndpoint(Endpoint):
                 id__in=OrganizationMember.objects.filter(user=request.user).values("organization")
             )
 
-        query = request.GET.get("query")
-        if query:
+        if query := request.GET.get("query"):
             tokens = tokenize_query(query)
             for key, value in tokens.items():
-                if key == "query":
+                if key == "email":
+                    queryset = queryset.filter(in_iexact("members__email", value))
+                elif key == "id":
+                    queryset = queryset.filter(id__in=value)
+                elif key == "member_id":
+                    queryset = queryset.filter(
+                        id__in=OrganizationMember.objects.filter(id__in=value).values(
+                            "organization"
+                        )
+                    )
+                elif key == "platform":
+                    queryset = queryset.filter(
+                        project__in=ProjectPlatform.objects.filter(platform__in=value).values(
+                            "project_id"
+                        )
+                    )
+                elif key == "query":
                     value = " ".join(value)
                     queryset = queryset.filter(
                         Q(name__icontains=value)
@@ -106,16 +122,6 @@ class OrganizationIndexEndpoint(Endpoint):
                     )
                 elif key == "slug":
                     queryset = queryset.filter(in_iexact("slug", value))
-                elif key == "email":
-                    queryset = queryset.filter(in_iexact("members__email", value))
-                elif key == "platform":
-                    queryset = queryset.filter(
-                        project__in=ProjectPlatform.objects.filter(platform__in=value).values(
-                            "project_id"
-                        )
-                    )
-                elif key == "id":
-                    queryset = queryset.filter(id__in=value)
                 elif key == "status":
                     try:
                         queryset = queryset.filter(
@@ -123,12 +129,6 @@ class OrganizationIndexEndpoint(Endpoint):
                         )
                     except KeyError:
                         queryset = queryset.none()
-                elif key == "member_id":
-                    queryset = queryset.filter(
-                        id__in=OrganizationMember.objects.filter(id__in=value).values(
-                            "organization"
-                        )
-                    )
                 else:
                     queryset = queryset.none()
 

@@ -66,9 +66,10 @@ class TestVisitor(ast.NodeVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
         if node.module == "sentry.testutils.silo":
             for name in node.names:
-                if isinstance(name, ast.alias):
-                    if name.name.endswith("_silo_test"):
-                        self.import_match_line = (node.lineno, node.col_offset)
+                if isinstance(name, ast.alias) and name.name.endswith(
+                    "_silo_test"
+                ):
+                    self.import_match_line = (node.lineno, node.col_offset)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> Any:
         if len(self.target_symbol_parts) == 2 and self.target_test_silo_mode[0] == node.name:
@@ -106,7 +107,7 @@ class TestVisitor(ast.NodeVisitor):
         if not match_line:
             return False
 
-        if not match_line[0] == lineno:
+        if match_line[0] != lineno:
             return False
 
         ws = b" " * match_line[1]

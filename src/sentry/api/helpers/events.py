@@ -29,8 +29,7 @@ def get_direct_hit_response(
     Checks whether a query is a direct hit for an event, and if so returns
     a response. Otherwise returns None
     """
-    event_id = normalize_event_id(query)
-    if event_id:
+    if event_id := normalize_event_id(query):
         snuba_filter, dataset = get_filter_for_group(f"id:{event_id}", snuba_params, group)
         results = eventstore.get_events(referrer=referrer, filter=snuba_filter, dataset=dataset)
 

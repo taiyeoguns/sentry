@@ -165,13 +165,13 @@ class OrganizationEventsStatsEndpoint(OrganizationEventsV2EndpointBase):  # type
             sentry_sdk.set_tag("performance.metrics_enhanced", metrics_enhanced)
 
         def get_event_stats(
-            query_columns: Sequence[str],
-            query: str,
-            params: Dict[str, str],
-            rollup: int,
-            zerofill_results: bool,
-            comparison_delta: Optional[datetime],
-        ) -> SnubaTSResult:
+                query_columns: Sequence[str],
+                query: str,
+                params: Dict[str, str],
+                rollup: int,
+                zerofill_results: bool,
+                comparison_delta: Optional[datetime],
+            ) -> SnubaTSResult:
             if top_events > 0:
                 return discover.top_events_timeseries(
                     timeseries_columns=query_columns,
@@ -183,11 +183,12 @@ class OrganizationEventsStatsEndpoint(OrganizationEventsV2EndpointBase):  # type
                     rollup=rollup,
                     limit=top_events,
                     organization=organization,
-                    referrer=referrer + ".find-topn",
+                    referrer=f"{referrer}.find-topn",
                     allow_empty=False,
                     zerofill_results=zerofill_results,
                     include_other=include_other,
                 )
+
             query_details = {
                 "selected_columns": query_columns,
                 "query": query,
