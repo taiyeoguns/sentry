@@ -30,9 +30,13 @@ class OrganizationSentryFunctionDetailsEndpoint(OrganizationEndpoint):
         return (args, kwargs)
 
     def get(self, request, organization, function):
-        if not features.has("organizations:sentry-functions", organization, actor=request.user):
-            return Response(status=404)
-        return Response(serialize(function), status=200)
+        return (
+            Response(serialize(function), status=200)
+            if features.has(
+                "organizations:sentry-functions", organization, actor=request.user
+            )
+            else Response(status=404)
+        )
 
     def put(self, request, organization, function):
         if not features.has("organizations:sentry-functions", organization, actor=request.user):

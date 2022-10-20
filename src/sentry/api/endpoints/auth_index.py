@@ -83,14 +83,11 @@ class AuthIndexEndpoint(Endpoint):
                     "u2f_authentication.value_error",
                     extra={"user": request.user.id, "error_message": err},
                 )
-                pass
             except LookupError:
                 logger.warning(
                     "u2f_authentication.interface_not_enrolled",
                     extra={"validated_data": validator.validated_data, "user": request.user.id},
                 )
-                pass
-        # attempt password authentication
         elif "password" in validator.validated_data:
             authenticated = request.user.check_password(validator.validated_data["password"])
             return authenticated
@@ -119,13 +116,12 @@ class AuthIndexEndpoint(Endpoint):
             else True
         )
 
-        if Superuser.org_id:
-            if (
-                not has_completed_sso(request, Superuser.org_id)
-                and not DISABLE_SSO_CHECK_SU_FORM_FOR_LOCAL_DEV
-            ):
-                request.session[PREFILLED_SU_MODAL_KEY] = request.data
-                self._reauthenticate_with_sso(request, Superuser.org_id)
+        if Superuser.org_id and (
+            not has_completed_sso(request, Superuser.org_id)
+            and not DISABLE_SSO_CHECK_SU_FORM_FOR_LOCAL_DEV
+        ):
+            request.session[PREFILLED_SU_MODAL_KEY] = request.data
+            self._reauthenticate_with_sso(request, Superuser.org_id)
 
         return authenticated
 
@@ -197,12 +193,7 @@ class AuthIndexEndpoint(Endpoint):
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         validator = AuthVerifyValidator(data=request.data)
 
-        if not (request.user.is_superuser and request.data.get("isSuperuserModal")):
-            if not validator.is_valid():
-                return self.respond(validator.errors, status=status.HTTP_400_BAD_REQUEST)
-
-            authenticated = self._verify_user_via_inputs(validator, request)
-        else:
+        if request.user.is_superuser and request.data.get("isSuperuserModal"):
             verify_authenticator = False
 
             if not DISABLE_SSO_CHECK_SU_FORM_FOR_LOCAL_DEV and not is_self_hosted():
@@ -213,15 +204,22 @@ class AuthIndexEndpoint(Endpoint):
                         "organizations:u2f-superuser-form", superuser_org, actor=request.user
                     )
 
-                if verify_authenticator:
-                    if not Authenticator.objects.filter(
+                if (
+                    verify_authenticator
+                    and not Authenticator.objects.filter(
                         user_id=request.user.id, type=U2fInterface.type
-                    ).exists():
-                        return Response(
-                            {"detail": {"code": "no_u2f"}}, status=status.HTTP_403_FORBIDDEN
-                        )
+                    ).exists()
+                ):
+                    return Response(
+                        {"detail": {"code": "no_u2f"}}, status=status.HTTP_403_FORBIDDEN
+                    )
             authenticated = self._validate_superuser(validator, request, verify_authenticator)
 
+        elif not validator.is_valid():
+            return self.respond(validator.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            authenticated = self._verify_user_via_inputs(validator, request)
         if not authenticated:
             return Response({"detail": {"code": "ignore"}}, status=status.HTTP_403_FORBIDDEN)
 

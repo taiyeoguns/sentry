@@ -10,12 +10,16 @@ class ApiAuthorizationSerializer(Serializer):
             for d in serialize({i.application for i in item_list if i.application_id}, user)
         }
 
-        attrs = {}
-        for item in item_list:
-            attrs[item] = {
-                "application": (apps.get(item.application.client_id) if item.application else None)
+        return {
+            item: {
+                "application": (
+                    apps.get(item.application.client_id)
+                    if item.application
+                    else None
+                )
             }
-        return attrs
+            for item in item_list
+        }
 
     def serialize(self, obj, attrs, user):
         return {

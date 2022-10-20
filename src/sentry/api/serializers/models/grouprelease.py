@@ -16,10 +16,7 @@ class GroupReleaseSerializer(Serializer):
         release_list = list(Release.objects.filter(id__in=[i.release_id for i in item_list]))
         releases = {r.id: d for r, d in zip(release_list, serialize(release_list, user))}
 
-        result = {}
-        for item in item_list:
-            result[item] = {"release": releases.get(item.release_id)}
-        return result
+        return {item: {"release": releases.get(item.release_id)} for item in item_list}
 
     def serialize(self, obj, attrs, user):
         return {

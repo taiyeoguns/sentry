@@ -114,7 +114,7 @@ class DashboardListSerializer(Serializer):
         return result
 
     def serialize(self, obj, attrs, user, **kwargs):
-        data = {
+        return {
             "id": str(obj.id),
             "title": obj.title,
             "dateCreated": obj.date_added,
@@ -122,7 +122,6 @@ class DashboardListSerializer(Serializer):
             "widgetDisplay": attrs.get("widget_display", []),
             "widgetPreview": attrs.get("widget_preview", []),
         }
-        return data
 
 
 @register(Dashboard)
@@ -147,7 +146,6 @@ class DashboardDetailsSerializer(Serializer):
     def serialize(self, obj, attrs, user, **kwargs):
         from sentry.api.serializers.rest_framework.base import camel_to_snake_case
 
-        page_filter_keys = ["environment", "period", "utc"]
         dashboard_filter_keys = ["release", "releaseId"]
         data = {
             "id": str(obj.id),
@@ -163,6 +161,7 @@ class DashboardDetailsSerializer(Serializer):
             if obj.filters.get("all_projects"):
                 data["projects"] = list(ALL_ACCESS_PROJECTS)
 
+            page_filter_keys = ["environment", "period", "utc"]
             for key in page_filter_keys:
                 if obj.filters.get(key) is not None:
                     data[key] = obj.filters[key]

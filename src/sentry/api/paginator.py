@@ -64,17 +64,16 @@ class BasePaginator:
                     new_order_by = list(queryset.query.order_by)
                     new_order_by[index] = f"-{queryset.query.order_by[index]}"
                     queryset.query.order_by = tuple(new_order_by)
-            elif ("-%s" % self.key) in queryset.query.order_by:
+            elif f"-{self.key}" in queryset.query.order_by:
                 if asc:
                     index = queryset.query.order_by.index(f"-{self.key}")
                     new_order_by = list(queryset.query.order_by)
                     new_order_by[index] = queryset.query.order_by[index][1:]
                     queryset.query.order_b = tuple(new_order_by)
+            elif asc:
+                queryset = queryset.order_by(self.key)
             else:
-                if asc:
-                    queryset = queryset.order_by(self.key)
-                else:
-                    queryset = queryset.order_by("-%s" % self.key)
+                queryset = queryset.order_by(f"-{self.key}")
 
         if value:
             assert self.key
@@ -108,11 +107,7 @@ class BasePaginator:
 
         limit = min(limit, self.max_limit)
 
-        if cursor.value:
-            cursor_value = self.value_from_cursor(cursor)
-        else:
-            cursor_value = 0
-
+        cursor_value = self.value_from_cursor(cursor) if cursor.value else 0
         queryset = self.build_queryset(cursor_value, cursor.is_prev)
 
         # TODO(dcramer): this does not yet work correctly for ``is_prev`` when
@@ -602,20 +597,17 @@ class CombinedQuerysetPaginator:
             return datetime.fromtimestamp(float(cursor.value) / self.multiplier).replace(
                 tzinfo=timezone.utc
             )
-        else:
-            value = cursor.value
-            if isinstance(value, float):
-                return math.floor(value) if self._is_asc(cursor.is_prev) else math.ceil(value)
-            if isinstance(value, str):
-                return unquote(value)
-            return value
+        value = cursor.value
+        if isinstance(value, float):
+            return math.floor(value) if self._is_asc(cursor.is_prev) else math.ceil(value)
+        return unquote(value) if isinstance(value, str) else value
 
     def _is_asc(self, is_prev):
         return (self.desc and is_prev) or not (self.desc or is_prev)
 
     def _build_combined_querysets(self, value, is_prev, limit, extra):
         asc = self._is_asc(is_prev)
-        combined_querysets = list()
+        combined_querysets = []
         for intermediary in self.intermediaries:
             key = intermediary.order_by[0]
             filters = {}
@@ -625,11 +617,7 @@ class CombinedQuerysetPaginator:
                 key = f"{key}_lower"
                 annotate[key] = Lower(intermediary.order_by[0])
 
-            if asc:
-                filter_condition = f"{key}__gte"
-            else:
-                filter_condition = f"{key}__lte"
-
+            filter_condition = f"{key}__gte" if asc else f"{key}__lte"
             if value is not None:
                 filters[filter_condition] = value
 
@@ -637,11 +625,7 @@ class CombinedQuerysetPaginator:
             for key in intermediary.order_by:
                 if self.case_insensitive:
                     key = f"{key}_lower"
-                if asc:
-                    queryset = queryset.order_by(key)
-                else:
-                    queryset = queryset.order_by(f"-{key}")
-
+                queryset = queryset.order_by(key) if asc else queryset.order_by(f"-{key}")
             queryset = queryset[: (limit + extra)]
             combined_querysets += list(queryset)
 
@@ -664,11 +648,7 @@ class CombinedQuerysetPaginator:
         if cursor is None:
             cursor = Cursor(0, 0, 0)
 
-        if cursor.value:
-            cursor_value = self.value_from_cursor(cursor)
-        else:
-            cursor_value = None
-
+        cursor_value = self.value_from_cursor(cursor) if cursor.value else None
         limit = min(limit, MAX_LIMIT)
 
         offset = cursor.offset

@@ -26,7 +26,7 @@ class SpansCountHistogramSerializer(serializers.Serializer):
         return data
 
     def validate_spanOp(self, spanOp: str):
-        if spanOp == "":
+        if not spanOp:
             raise serializers.ValidationError("span op cannot be empty.")
         return spanOp
 
@@ -49,23 +49,22 @@ class OrganizationEventsSpansCountHistogramEndpoint(OrganizationEventsV2Endpoint
 
         with sentry_sdk.start_span(op="discover.endpoint", description="spans_count_histogram"):
             serializer = SpansCountHistogramSerializer(data=request.GET)
-            if serializer.is_valid():
-                data = serializer.validated_data
-                span_op = data["spanOp"]
-
-                with self.handle_query_errors():
-                    results = discover.span_count_histogram_query(
-                        span_op,
-                        data.get("query"),
-                        params,
-                        data["numBuckets"],
-                        data["precision"],
-                        min_value=data.get("min"),
-                        max_value=data.get("max"),
-                        data_filter=data.get("dataFilter"),
-                        referrer="api.organization-events-spans-count-histogram",
-                    )
-
-                return Response(results)
-            else:
+            if not serializer.is_valid():
                 return Response(serializer.errors, status=400)
+            data = serializer.validated_data
+            span_op = data["spanOp"]
+
+            with self.handle_query_errors():
+                results = discover.span_count_histogram_query(
+                    span_op,
+                    data.get("query"),
+                    params,
+                    data["numBuckets"],
+                    data["precision"],
+                    min_value=data.get("min"),
+                    max_value=data.get("max"),
+                    data_filter=data.get("dataFilter"),
+                    referrer="api.organization-events-spans-count-histogram",
+                )
+
+            return Response(results)

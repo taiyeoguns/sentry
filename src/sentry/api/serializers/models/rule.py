@@ -61,7 +61,6 @@ class RuleSerializer(Serializer):
             result[rule_activity.rule].update({"created_by": user})
 
         rules = {item.id: item for item in item_list}
-        resolved_actors = {}
         owners_by_type = defaultdict(list)
 
         sentry_app_uuids = {
@@ -89,11 +88,16 @@ class RuleSerializer(Serializer):
             if item.owner_id is not None:
                 owners_by_type[actor_type_to_string(item.owner.type)].append(item.owner_id)
 
-        for k, v in ACTOR_TYPES.items():
-            resolved_actors[k] = {
+        resolved_actors = {
+            k: {
                 a.actor_id: a.id
-                for a in actor_type_to_class(v).objects.filter(actor_id__in=owners_by_type[k])
+                for a in actor_type_to_class(v).objects.filter(
+                    actor_id__in=owners_by_type[k]
+                )
             }
+            for k, v in ACTOR_TYPES.items()
+        }
+
         for rule in rules.values():
             if rule.owner_id:
                 type = actor_type_to_string(rule.owner.type)
@@ -101,10 +105,9 @@ class RuleSerializer(Serializer):
                     result[rule]["owner"] = f"{type}:{resolved_actors[type][rule.owner_id]}"
 
             for action in rule.data.get("actions", []):
-                install = sentry_app_installations_by_uuid.get(
+                if install := sentry_app_installations_by_uuid.get(
                     action.get("sentryAppInstallationUuid")
-                )
-                if install:
+                ):
                     action["_sentry_app_component"] = install.get("sentry_app_component")
                     action["_sentry_app_installation"] = install.get("sentry_app_installation")
 
@@ -116,7 +119,7 @@ class RuleSerializer(Serializer):
                 .annotate(date_added=Max("date_added"))
             }
             for rule in item_list:
-                result[rule]["last_triggered"] = last_triggered_lookup.get(rule.id, None)
+                result[rule]["last_triggered"] = last_triggered_lookup.get(rule.id)
 
         return result
 

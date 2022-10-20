@@ -48,6 +48,6 @@ class DocIntegrationSerializer(Serializer):
         }
 
         if obj.metadata:
-            data.update(obj.metadata)
+            data |= obj.metadata
 
         return data

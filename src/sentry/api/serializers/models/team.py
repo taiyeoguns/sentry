@@ -48,15 +48,15 @@ if TYPE_CHECKING:
 
 def _get_team_memberships(team_list: Sequence[Team], user: User) -> Mapping[int, str | None]:
     """Get memberships the user has in the provided team list"""
-    if not user.is_authenticated:
-        return {}
-
-    return {
-        team_id: team_role
-        for (team_id, team_role) in OrganizationMemberTeam.objects.filter(
-            organizationmember__user=user, team__in=team_list
-        ).values_list("team__id", "role")
-    }
+    return (
+        dict(
+            OrganizationMemberTeam.objects.filter(
+                organizationmember__user=user, team__in=team_list
+            ).values_list("team__id", "role")
+        )
+        if user.is_authenticated
+        else {}
+    )
 
 
 def get_member_totals(team_list: Sequence[Team], user: User) -> Mapping[str, int]:
@@ -77,16 +77,16 @@ def get_member_totals(team_list: Sequence[Team], user: User) -> Mapping[str, int
 
 def get_org_roles(org_ids: Set[int], user: User) -> Mapping[int, str]:
     """Get the role the user has in each org"""
-    if not user.is_authenticated:
-        return {}
-
-    # map of org id to role
-    return {
-        om["organization_id"]: om["role"]
-        for om in OrganizationMember.objects.filter(
-            user=user, organization__in=set(org_ids)
-        ).values("role", "organization_id")
-    }
+    return (
+        {
+            om["organization_id"]: om["role"]
+            for om in OrganizationMember.objects.filter(
+                user=user, organization__in=set(org_ids)
+            ).values("role", "organization_id")
+        }
+        if user.is_authenticated
+        else {}
+    )
 
 
 def get_access_requests(item_list: Sequence[Team], user: User) -> AbstractSet[Team]:
@@ -127,15 +127,10 @@ class TeamSerializer(Serializer):  # type: ignore
         self.expand = expand
 
     def _expand(self, key: str) -> bool:
-        if self.expand is None:
-            return False
-
-        return key in self.expand
+        return False if self.expand is None else key in self.expand
 
     def _collapse(self, key: str) -> bool:
-        if self.collapse is None:
-            return False
-        return key in self.collapse
+        return False if self.collapse is None else key in self.collapse
 
     def get_attrs(
         self, item_list: Sequence[Team], user: User, **kwargs: Any

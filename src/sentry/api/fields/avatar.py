@@ -36,9 +36,7 @@ class AvatarField(serializers.Field):
         self.is_sentry_app = is_sentry_app
 
     def to_representation(self, value):
-        if not value:
-            return ""
-        return value.getvalue()
+        return value.getvalue() if value else ""
 
     def to_internal_value(self, data):
         if not data:
@@ -66,8 +64,4 @@ class AvatarField(serializers.Field):
     def is_valid_size(self, width, height):
         if width != height:
             return False
-        if width < self.min_dimension:
-            return False
-        if width > self.max_dimension:
-            return False
-        return True
+        return False if width < self.min_dimension else width <= self.max_dimension

@@ -7,14 +7,15 @@ from sentry.models import Broadcast, BroadcastSeen
 @register(Broadcast)
 class BroadcastSerializer(Serializer):
     def get_attrs(self, item_list, user):
-        if not user.is_authenticated:
-            seen = set()
-        else:
-            seen = set(
-                BroadcastSeen.objects.filter(broadcast__in=item_list, user=user).values_list(
-                    "broadcast", flat=True
-                )
+        seen = (
+            set(
+                BroadcastSeen.objects.filter(
+                    broadcast__in=item_list, user=user
+                ).values_list("broadcast", flat=True)
             )
+            if user.is_authenticated
+            else set()
+        )
 
         return {item: {"seen": item.id in seen} for item in item_list}
 

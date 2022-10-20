@@ -115,9 +115,7 @@ class PickledObjectField(models.Field):
 
         """
         if self.has_default():
-            if callable(self.default):
-                return self.default()
-            return self.default
+            return self.default() if callable(self.default) else self.default
         # If the field doesn't have a default, then we punt to models.Field.
         return super().get_default()
 
@@ -219,5 +217,5 @@ class PickledObjectField(models.Field):
         We need to limit the lookup types.
         """
         if lookup_name not in ["exact", "in", "isnull"]:
-            raise TypeError("Lookup type %s is not supported." % lookup_name)
+            raise TypeError(f"Lookup type {lookup_name} is not supported.")
         return super().get_lookup(lookup_name)

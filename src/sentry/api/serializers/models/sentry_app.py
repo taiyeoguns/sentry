@@ -55,7 +55,7 @@ class SentryAppSerializer(Serializer):
             data["featureData"] = [serialize(x, user) for x in attrs.get("features")]
 
         if obj.status == SentryAppStatus.PUBLISHED and obj.date_published:
-            data.update({"datePublished": obj.date_published})
+            data["datePublished"] = obj.date_published
 
         if (env.request and is_active_superuser(env.request)) or (
             hasattr(user, "get_orgs") and obj.owner in user.get_orgs()
@@ -63,12 +63,11 @@ class SentryAppSerializer(Serializer):
             client_secret = (
                 obj.application.client_secret if obj.show_auth_info(access) else MASKED_VALUE
             )
-            data.update(
-                {
-                    "clientId": obj.application.client_id,
-                    "clientSecret": client_secret,
-                    "owner": {"id": obj.owner.id, "slug": obj.owner.slug},
-                }
-            )
+            data |= {
+                "clientId": obj.application.client_id,
+                "clientSecret": client_secret,
+                "owner": {"id": obj.owner.id, "slug": obj.owner.slug},
+            }
+
 
         return data

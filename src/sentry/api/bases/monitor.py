@@ -41,7 +41,7 @@ class MonitorEndpoint(Endpoint):
 
         request._request.organization = project.organization
 
-        kwargs.update({"monitor": monitor, "project": project})
+        kwargs |= {"monitor": monitor, "project": project}
         return args, kwargs
 
     def handle_exception(self, request: Request, exc: Exception) -> Response:

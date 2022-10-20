@@ -32,6 +32,8 @@ class OrganizationDashboardWidgetDetailsEndpoint(OrganizationEndpoint):
                 "displayType": request.data.get("displayType"),
             },
         )
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
-        return Response({}, status=200)
+        return (
+            Response({}, status=200)
+            if serializer.is_valid()
+            else Response(serializer.errors, status=400)
+        )

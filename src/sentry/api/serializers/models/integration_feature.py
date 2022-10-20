@@ -30,5 +30,5 @@ class IntegrationFeatureSerializer(Serializer):
             # These properties require a target on the IntegrationFeature.
             # If no target is provided, the serialized IntegrationFeature payload will be generic,
             # and not only applicable to one target.
-            data.update({"description": attrs.get("description")})
+            data["description"] = attrs.get("description")
         return data

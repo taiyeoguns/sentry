@@ -175,13 +175,13 @@ class OrganizationSerializer(Serializer):  # type: ignore
         auth_providers = {
             a.organization_id: a for a in AuthProvider.objects.filter(organization__in=item_list)
         }
-        data: MutableMapping[Organization, MutableMapping[str, Any]] = {}
-        for item in item_list:
-            data[item] = {
+        return {
+            item: {
                 "avatar": avatars.get(item.id),
                 "auth_provider": auth_providers.get(item.id, None),
             }
-        return data
+            for item in item_list
+        }
 
     def serialize(
         self, obj: Organization, attrs: Mapping[str, Any], user: User
@@ -207,11 +207,9 @@ class OrganizationSerializer(Serializer):  # type: ignore
         ]
         feature_list = set()
 
-        # Check features in batch using the entity handler
-        batch_features = features.batch_has(org_features, actor=user, organization=obj)
-
-        # batch_has has found some features
-        if batch_features:
+        if batch_features := features.batch_has(
+            org_features, actor=user, organization=obj
+        ):
             for feature_name, active in batch_features.get(f"organization:{obj.id}", {}).items():
                 if active:
                     # Remove organization prefix
@@ -297,10 +295,7 @@ class OnboardingTasksSerializer(Serializer):  # type: ignore
         serialized_users = serialize(users, user, UserSerializer())
         user_map = {user["id"]: user for user in serialized_users}
 
-        data: MutableMapping[OrganizationOnboardingTask, _OnboardingTasksAttrs] = {}
-        for item in item_list:
-            data[item] = {"user": user_map.get(str(item.user_id))}
-        return data
+        return {item: {"user": user_map.get(str(item.user_id))} for item in item_list}
 
     def serialize(
         self, obj: OrganizationOnboardingTask, attrs: _OnboardingTasksAttrs, user: User

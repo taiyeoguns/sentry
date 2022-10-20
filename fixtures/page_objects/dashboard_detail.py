@@ -11,8 +11,8 @@ class DashboardDetailPage(BasePage):
     def __init__(self, browser, client, **kwargs):
         super().__init__(browser)
         self.client = client
-        self.organization = kwargs.get("organization", None)
-        self.dashboard = kwargs.get("dashboard", None)
+        self.organization = kwargs.get("organization")
+        self.dashboard = kwargs.get("dashboard")
 
     def wait_until_loaded(self):
         self.browser.wait_until_not('[data-test-id="events-request-loading"]')

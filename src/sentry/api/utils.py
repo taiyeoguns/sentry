@@ -71,9 +71,8 @@ def get_date_range_from_params(params, optional=False, default_stats_period=MAX_
     elif timeframe_start or timeframe_end:
         if not all([timeframe_start, timeframe_end]):
             raise InvalidParams("timeframeStart and timeframeEnd are both required")
-        else:
-            params["statsPeriodStart"] = timeframe_start
-            params["statsPeriodEnd"] = timeframe_end
+        params["statsPeriodStart"] = timeframe_start
+        params["statsPeriodEnd"] = timeframe_end
 
     return get_date_range_from_stats_period(
         params, optional=optional, default_stats_period=default_stats_period
@@ -163,17 +162,22 @@ def generate_organization_hostname(org_slug: str) -> str:
     if not org_base_hostname_template:
         return url_prefix_hostname
     has_org_slug_placeholder = "{slug}" in org_base_hostname_template
-    if not has_org_slug_placeholder:
-        return url_prefix_hostname
-    org_hostname = org_base_hostname_template.replace("{slug}", org_slug)
-    return org_hostname
+    return (
+        org_base_hostname_template.replace("{slug}", org_slug)
+        if has_org_slug_placeholder
+        else url_prefix_hostname
+    )
 
 
 def generate_organization_url(org_slug: str) -> str:
     org_url_template = options.get("system.organization-url-template")
-    if not org_url_template:
-        return options.get("system.url-prefix")
-    return org_url_template.replace("{hostname}", generate_organization_hostname(org_slug))
+    return (
+        org_url_template.replace(
+            "{hostname}", generate_organization_hostname(org_slug)
+        )
+        if org_url_template
+        else options.get("system.url-prefix")
+    )
 
 
 def generate_region_url() -> str:

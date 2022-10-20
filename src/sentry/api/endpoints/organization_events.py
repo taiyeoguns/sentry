@@ -106,8 +106,8 @@ class OrganizationEventsEndpoint(OrganizationEventsV2EndpointBase):
 
     enforce_rate_limit = True
 
-    def rate_limits(*args, **kwargs) -> RateLimitConfig:
-        return rate_limit_events(*args, **kwargs)
+    def rate_limits(self, **kwargs) -> RateLimitConfig:
+        return rate_limit_events(*self, **kwargs)
 
     @extend_schema(
         operation_id="Query Discover Events in Table Format",

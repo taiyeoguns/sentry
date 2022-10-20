@@ -6,9 +6,7 @@ from sentry.models import Repository
 class RepositorySerializer(Serializer):
     def serialize(self, obj, attrs, user):
         external_slug = None
-        integration_id = None
-        if obj.integration_id:
-            integration_id = str(obj.integration_id)
+        integration_id = str(obj.integration_id) if obj.integration_id else None
         if obj.provider:
             repo_provider = obj.get_provider()
             provider = {"id": obj.provider, "name": repo_provider.name}

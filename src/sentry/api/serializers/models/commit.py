@@ -7,11 +7,11 @@ from sentry.models import Commit, PullRequest, Repository
 
 
 def get_users_for_commits(item_list, user=None) -> Mapping[str, Author]:
-    authors = list(
-        CommitAuthor.objects.get_many_from_cache([i.author_id for i in item_list if i.author_id])
-    )
-
-    if authors:
+    if authors := list(
+        CommitAuthor.objects.get_many_from_cache(
+            [i.author_id for i in item_list if i.author_id]
+        )
+    ):
         org_ids = {item.organization_id for item in item_list}
         if len(org_ids) == 1:
             return get_users_for_authors(organization_id=org_ids.pop(), authors=authors, user=user)
@@ -22,7 +22,7 @@ def get_users_for_commits(item_list, user=None) -> Mapping[str, Author]:
 class CommitSerializer(Serializer):
     def __init__(self, exclude=None, include=None, *args, **kwargs):
         Serializer.__init__(self, *args, **kwargs)
-        self.exclude = frozenset(exclude if exclude else ())
+        self.exclude = frozenset(exclude or ())
 
     def get_attrs(self, item_list, user):
         if "author" not in self.exclude:
@@ -48,15 +48,16 @@ class CommitSerializer(Serializer):
 
         pull_request_by_commit = {pr.merge_commit_sha: serialize(pr) for pr in pull_requests}
 
-        result = {}
-        for item in item_list:
-            result[item] = {
+        return {
+            item: {
                 "repository": repository_objs.get(str(item.repository_id), {}),
-                "user": users_by_author.get(str(item.author_id), {}) if item.author_id else {},
+                "user": users_by_author.get(str(item.author_id), {})
+                if item.author_id
+                else {},
                 "pull_request": pull_request_by_commit.get(item.key, None),
             }
-
-        return result
+            for item in item_list
+        }
 
     def serialize(self, obj, attrs, user):
         d = {
@@ -76,7 +77,7 @@ class CommitSerializer(Serializer):
 class CommitWithReleaseSerializer(CommitSerializer):
     def __init__(self, exclude=None, include=None, *args, **kwargs):
         Serializer.__init__(self, *args, **kwargs)
-        self.exclude = frozenset(exclude if exclude else ())
+        self.exclude = frozenset(exclude or ())
 
     def get_attrs(self, item_list, user):
         from sentry.models import ReleaseCommit

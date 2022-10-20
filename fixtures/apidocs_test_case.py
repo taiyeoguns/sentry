@@ -39,7 +39,6 @@ class APIDocsTestCase(APITestCase):
         assert result.errors == []
 
     def create_event(self, name, **kwargs):
-        # Somewhat sane default data.
         data = {
             "event_id": (name * 32)[:32],
             "fingerprint": ["1"],
@@ -47,7 +46,6 @@ class APIDocsTestCase(APITestCase):
             "timestamp": iso_format(before_now(seconds=1)),
             "user": {"id": self.user.id, "email": self.user.email},
             "release": name,
-        }
-        data.update(kwargs)
+        } | kwargs
 
         return self.store_event(data=data, project_id=self.project.id)

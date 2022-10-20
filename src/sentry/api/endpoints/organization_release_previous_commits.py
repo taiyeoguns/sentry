@@ -57,12 +57,13 @@ class OrganizationReleasePreviousCommitsEndpoint(OrganizationReleasesBaseEndpoin
             user_agent=request.META.get("HTTP_USER_AGENT", ""),
         )
 
-        if not prev_release_with_commits:
-            return Response({})
-
-        return Response(
-            serialize(
-                prev_release_with_commits[0],
-                request.user,
+        return (
+            Response(
+                serialize(
+                    prev_release_with_commits[0],
+                    request.user,
+                )
             )
+            if prev_release_with_commits
+            else Response({})
         )

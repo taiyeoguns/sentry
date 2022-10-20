@@ -44,10 +44,11 @@ class OrganizationCodeMappingCodeOwnersEndpoint(OrganizationEndpoint):
         except ApiError as e:
             return self.respond({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not codeowner_contents:
-            return self.respond(status=status.HTTP_404_NOT_FOUND)
-
-        return self.respond(
-            codeowner_contents,
-            status=status.HTTP_200_OK,
+        return (
+            self.respond(
+                codeowner_contents,
+                status=status.HTTP_200_OK,
+            )
+            if codeowner_contents
+            else self.respond(status=status.HTTP_404_NOT_FOUND)
         )

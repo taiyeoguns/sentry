@@ -32,7 +32,7 @@ class ReleaseActivitySerializer(Serializer):  # type: ignore
         def _expand_group(d: Mapping[str, Any]) -> Mapping[str, Any]:
             if d.get("group_id"):
                 d_copy = dict(d)
-                d_copy["group"] = serialized_groups.get(str(d.get("group_id")), None)
+                d_copy["group"] = serialized_groups.get(str(d.get("group_id")))
                 return d_copy
 
             return d

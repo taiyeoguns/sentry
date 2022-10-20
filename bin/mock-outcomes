@@ -23,14 +23,15 @@ def store_outcomes(outcome, num_times=1):
         outcomes.append(outcome_copy)
     assert (
         requests.post(
-            settings.SENTRY_SNUBA + "/tests/outcomes/insert", data=json.dumps(outcomes)
+            f"{settings.SENTRY_SNUBA}/tests/outcomes/insert",
+            data=json.dumps(outcomes),
         ).status_code
         == 200
     )
 
 
 def generate_outcomes():
-    for i in range(0, 180):
+    for i in range(180):
         for outcome in [
             Outcome.RATE_LIMITED,
             Outcome.INVALID,
@@ -61,7 +62,12 @@ def generate_outcomes():
 
 
 def drop_outcomes():
-    assert requests.post(settings.SENTRY_SNUBA + "/tests/outcomes/drop").status_code == 200
+    assert (
+        requests.post(
+            f"{settings.SENTRY_SNUBA}/tests/outcomes/drop"
+        ).status_code
+        == 200
+    )
 
 
 if __name__ == "__main__":

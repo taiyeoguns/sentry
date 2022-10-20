@@ -123,9 +123,10 @@ class OrganizationVitalsOverviewEndpoint(OrganizationEventsEndpointBase):
 
         # TODO: add caching
         # try to get all the projects for the org even though it's possible they don't have access
-        projects = Project.objects.filter(organization=organization, status=ProjectStatus.VISIBLE)[
-            0 : settings.ORGANIZATION_VITALS_OVERVIEW_PROJECT_LIMIT
-        ]
+        projects = Project.objects.filter(
+            organization=organization, status=ProjectStatus.VISIBLE
+        )[: settings.ORGANIZATION_VITALS_OVERVIEW_PROJECT_LIMIT]
+
 
         # if we are at the limit, then it's likely we didn't get every project in the org
         # so the result we are returning for the organization aggregatation would not be accurate
@@ -149,11 +150,7 @@ class OrganizationVitalsOverviewEndpoint(OrganizationEventsEndpointBase):
                 return self.respond(NO_RESULT_RESPONSE)
 
             # take data and transform output
-            output = {}
-            # only a single result
-            for key, val in org_data[0].items():
-                output[NAME_MAPPING[key]] = val
-
+            output = {NAME_MAPPING[key]: val for key, val in org_data[0].items()}
             # check access for project level data
             access_by_project = get_access_by_project(projects, request.user)
             projects_with_access = list(
@@ -166,10 +163,10 @@ class OrganizationVitalsOverviewEndpoint(OrganizationEventsEndpointBase):
                 # skip ones with no access
                 if one_project_data["project_id"] not in project_ids_with_access:
                     continue
-                mapped_project_data = {}
-                # for each project, map the data
-                for key, val in one_project_data.items():
-                    mapped_project_data[NAME_MAPPING[key]] = val
+                mapped_project_data = {
+                    NAME_MAPPING[key]: val for key, val in one_project_data.items()
+                }
+
                 output["projectData"].append(mapped_project_data)
 
             return self.respond(output)

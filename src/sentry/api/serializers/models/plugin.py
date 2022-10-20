@@ -23,7 +23,10 @@ def is_plugin_deprecated(plugin, project: Project) -> bool:
     the plugin slug is present and the organization doesn't have the override feature.
     """
     deprecation_date = getattr(plugin, "deprecation_date", None)
-    is_past_deprecation_date = datetime.today() > deprecation_date if deprecation_date else False
+    is_past_deprecation_date = (
+        datetime.now() > deprecation_date if deprecation_date else False
+    )
+
     return is_past_deprecation_date or (
         plugin.slug in SHADOW_DEPRECATED_PLUGINS
         and not features.has(

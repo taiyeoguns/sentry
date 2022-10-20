@@ -82,15 +82,15 @@ class GroupEventsEndpoint(GroupEndpoint, EnvironmentMixin):  # type: ignore
         params = {
             "project_id": [group.project_id],
             "organization_id": group.project.organization_id,
-            "start": start if start else default_start,
-            "end": end if end else default_end,
+            "start": start or default_start,
+            "end": end or default_end,
         }
+
         referrer = f"api.group-events.{group.issue_category.name.lower()}"
 
-        direct_hit_resp = get_direct_hit_response(
+        if direct_hit_resp := get_direct_hit_response(
             request, query, params, f"{referrer}.direct-hit", group
-        )
-        if direct_hit_resp:
+        ):
             return direct_hit_resp
 
         if environments:
@@ -120,12 +120,8 @@ class GroupEventsEndpoint(GroupEndpoint, EnvironmentMixin):  # type: ignore
     def _get_search_query(
         self, request: Request, group: Group, environments: Sequence[Environment]
     ) -> Optional[str]:
-        raw_query = request.GET.get("query")
-
-        if raw_query:
+        if raw_query := request.GET.get("query"):
             query_kwargs = parse_query([group.project], raw_query, request.user, environments)
-            query = cast(str, query_kwargs.pop("query", None))
+            return cast(str, query_kwargs.pop("query", None))
         else:
-            query = None
-
-        return query
+            return None

@@ -9,17 +9,17 @@ class AlertRuleTriggerActionSerializer(Serializer):
         if action.type == action.Type.EMAIL.value:
             if action.target:
                 if action.target_type == action.TargetType.USER.value:
-                    return "Send a notification to " + action.target.email
+                    return f"Send a notification to {action.target.email}"
                 elif action.target_type == action.TargetType.TEAM.value:
-                    return "Send an email to members of #" + action.target.slug
+                    return f"Send an email to members of #{action.target.slug}"
         elif action.type == action.Type.PAGERDUTY.value:
-            return "Send a PagerDuty notification to " + action.target_display
+            return f"Send a PagerDuty notification to {action.target_display}"
         elif action.type == action.Type.SLACK.value:
-            return "Send a Slack notification to " + action.target_display
+            return f"Send a Slack notification to {action.target_display}"
         elif action.type == action.Type.MSTEAMS.value:
-            return "Send a Microsoft Teams notification to " + action.target_display
+            return f"Send a Microsoft Teams notification to {action.target_display}"
         elif action.type == action.Type.SENTRY_APP.value:
-            return "Send a notification via " + action.target_display
+            return f"Send a notification via {action.target_display}"
 
     def get_identifier_from_action(self, action):
         if action.type in [

@@ -75,7 +75,7 @@ def get_all_teams(team: Optional[str] = None) -> Set[str]:
 
     teams = set()
     with open(codeowners_filename) as f:
-        for line in f.readlines():
+        for line in f:
             teams.update(TEAM_REGEX.findall(line))
 
     logger.debug("All teams")
@@ -110,7 +110,7 @@ def load_cache(filename: Optional[str] = None) -> MutableMapping[str, int]:
     cache = {}
     with open(filename) as f:
         try:
-            for line in f.readlines():
+            for line in f:
                 key, value = line.split(CACHE_SEPARATOR)
                 cache[key] = int(value)
         except (AttributeError, OSError, TypeError, ValueError):
@@ -134,10 +134,10 @@ def hash_file(filename: str) -> str:
     func = hashlib.md5()
     with open(filename, "rb") as f:
         while True:
-            block = f.read(1024 * func.block_size)
-            if not block:
+            if block := f.read(1024 * func.block_size):
+                func.update(block)
+            else:
                 break
-            func.update(block)
     return func.hexdigest()
 
 

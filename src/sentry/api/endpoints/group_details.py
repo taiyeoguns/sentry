@@ -73,14 +73,14 @@ class GroupDetailsEndpoint(GroupEndpoint, EnvironmentMixin):
             if is_plugin_deprecated(plugin, project):
                 continue
 
-            results = safe_execute(
-                plugin.actions, request, group, action_list, _with_transaction=False
-            )
-
-            if not results:
-                continue
-
-            action_list = results
+            if results := safe_execute(
+                plugin.actions,
+                request,
+                group,
+                action_list,
+                _with_transaction=False,
+            ):
+                action_list = results
 
         for plugin in plugins.for_project(project, version=2):
             if is_plugin_deprecated(plugin, project):
@@ -97,9 +97,9 @@ class GroupDetailsEndpoint(GroupEndpoint, EnvironmentMixin):
 
         plugin_issues = []
         for plugin in plugins.for_project(project, version=1):
-            if isinstance(plugin, IssueTrackingPlugin2):
-                if is_plugin_deprecated(plugin, project):
-                    continue
+            if isinstance(
+                plugin, IssueTrackingPlugin2
+            ) and not is_plugin_deprecated(plugin, project):
                 plugin_issues = safe_execute(
                     plugin.plugin_issues, request, group, plugin_issues, _with_transaction=False
                 )
@@ -187,12 +187,13 @@ class GroupDetailsEndpoint(GroupEndpoint, EnvironmentMixin):
             tags = tagstore.get_group_tag_keys(group, environment_ids, limit=100)
 
             user_reports = (
-                UserReport.objects.filter(group_id=group.id)
-                if not environment_ids
-                else UserReport.objects.filter(
+                UserReport.objects.filter(
                     group_id=group.id, environment_id__in=environment_ids
                 )
+                if environment_ids
+                else UserReport.objects.filter(group_id=group.id)
             )
+
 
             hourly_stats, daily_stats = self.__group_hourly_daily_stats(group, environment_ids)
 

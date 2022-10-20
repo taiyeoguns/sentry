@@ -5,18 +5,17 @@ from sentry.models import Deploy, Environment
 @register(Deploy)
 class DeploySerializer(Serializer):
     def get_attrs(self, item_list, user, **kwargs):
-        environments = {
-            id: name
-            for id, name in Environment.objects.filter(
+        environments = dict(
+            Environment.objects.filter(
                 id__in=[d.environment_id for d in item_list]
             ).values_list("id", "name")
+        )
+
+
+        return {
+            item: {"environment": environments.get(item.environment_id)}
+            for item in item_list
         }
-
-        result = {}
-        for item in item_list:
-            result[item] = {"environment": environments.get(item.environment_id)}
-
-        return result
 
     def serialize(self, obj, attrs, user, **kwargs):
         return {

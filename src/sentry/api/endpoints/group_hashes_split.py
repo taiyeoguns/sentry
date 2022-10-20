@@ -162,10 +162,7 @@ def _get_full_hierarchical_hashes(group: Group, hash: str) -> Optional[Sequence[
     data = snuba.raw_snql_query(request, referrer="group_split.get_full_hierarchical_hashes")[
         "data"
     ]
-    if not data:
-        return None
-
-    return data[0]["hierarchical_hashes"]
+    return data[0]["hierarchical_hashes"] if data else None
 
 
 def _unsplit_group(group: Group, hash: str, hierarchical_hashes: Optional[Sequence[str]] = None):

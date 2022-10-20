@@ -56,9 +56,12 @@ class SentryAppPublishRequestEndpoint(SentryAppBaseEndpoint):
         message = f"User {request.user.email} of organization {sentry_app.owner.slug} wants to publish {sentry_app.slug}\n"
 
         for question_pair in request.data.get("questionnaire"):
-            message += "\n\n>{}\n{}".format(question_pair["question"], question_pair["answer"])
+            message += f'\n\n>{question_pair["question"]}\n{question_pair["answer"]}'
 
-        subject = "Sentry Integration Publication Request from %s" % sentry_app.owner.slug
+        subject = (
+            f"Sentry Integration Publication Request from {sentry_app.owner.slug}"
+        )
+
 
         email.send_mail(
             subject,

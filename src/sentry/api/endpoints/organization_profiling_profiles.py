@@ -34,7 +34,7 @@ class OrganizationProfilingBaseEndpoint(OrganizationEventsV2EndpointBase):  # ty
         except InvalidSearchQuery as err:
             raise ParseError(detail=str(err))
 
-        params.update(self.get_filter_params(request, organization))
+        params |= self.get_filter_params(request, organization)
 
         return params
 

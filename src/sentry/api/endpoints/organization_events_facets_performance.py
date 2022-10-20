@@ -177,7 +177,7 @@ class OrganizationEventsFacetsPerformanceHistogramEndpoint(
                     return {"tags": [], "histogram": {"data": []}}
 
                 # Only pass exactly the number of tags so histogram fetches correct number of rows
-                histogram_top_tags = top_tags[0:raw_limit]
+                histogram_top_tags = top_tags[:raw_limit]
 
                 histogram = query_facet_performance_key_histogram(
                     top_tags=histogram_top_tags,
@@ -226,13 +226,12 @@ class HistogramPaginator(GenericOffsetPaginator):
         # Use raw_limit for the histogram itself so bucket calculations are correct
         data = self.data_fn(offset=offset, limit=limit + 1, raw_limit=limit)
 
-        if isinstance(data["tags"], list):
-            has_more = len(data["tags"]) == limit + 1
-            if has_more:
-                data["tags"].pop()
-        else:
+        if not isinstance(data["tags"], list):
             raise NotImplementedError
 
+        has_more = len(data["tags"]) == limit + 1
+        if has_more:
+            data["tags"].pop()
         return CursorResult(
             data,
             prev=Cursor(0, max(0, offset - limit), True, offset > 0),
@@ -283,9 +282,7 @@ def query_tag_data(
         # Return early to avoid doing more queries with 0 count transactions or aggregates for columns that don't exist
         if counts[0] == 0 or aggregates[0] is None:
             return None
-    if not tag_data["data"][0]:
-        return None
-    return tag_data["data"][0]
+    return tag_data["data"][0] or None
 
 
 def query_top_tags(
@@ -346,9 +343,7 @@ def query_top_tags(
         # Return early to avoid doing more queries with 0 count transactions or aggregates for columns that don't exist
         if counts[0] == 0:
             return None
-    if not tag_data["data"]:
-        return None
-    return tag_data["data"]
+    return tag_data["data"] or None
 
 
 def query_facet_performance(
@@ -376,13 +371,13 @@ def query_facet_performance(
 
     dynamic_sample_rate = 0 if transaction_count <= 0 else (target_sample / transaction_count)
     sample_rate = min(max(dynamic_sample_rate, 0), 1) if sampling_enabled else None
-    frequency_sample_rate = sample_rate if sample_rate else 1
+    frequency_sample_rate = sample_rate or 1
 
     tag_key_limit = limit if tag_key else 1
 
     with sentry_sdk.start_span(
-        op="discover.discover", description="facets.filter_transform"
-    ) as span:
+            op="discover.discover", description="facets.filter_transform"
+        ) as span:
         span.set_data("query", filter_query)
         tag_query = QueryBuilder(
             dataset=Dataset.Discover,
@@ -392,8 +387,9 @@ def query_facet_performance(
             sample_rate=sample_rate,
             turbo=sample_rate is not None,
             limit=limit,
-            limitby=["tags_key", tag_key_limit] if not tag_key else None,
+            limitby=None if tag_key else ["tags_key", tag_key_limit],
         )
+
     translated_aggregate_column = tag_query.resolve_column(aggregate_column)
 
     # Aggregate (avg) and count of all transactions for this query
@@ -475,7 +471,7 @@ def query_facet_performance_key_histogram(
 
     tag_values = [x["tags_value"] for x in top_tags]
 
-    results = discover.histogram_query(
+    return discover.histogram_query(
         fields=[
             aggregate_column,
         ],
@@ -492,4 +488,3 @@ def query_facet_performance_key_histogram(
         referrer="api.organization-events-facets-performance-histogram",
         normalize_results=False,
     )
-    return results

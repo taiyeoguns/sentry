@@ -119,9 +119,8 @@ class SentryAppsBaseEndpoint(IntegrationPlatformEndpoint):
         organization_slug = self._get_organization_slug(request)
         if is_active_superuser(request):
             return self._get_organization_for_superuser(organization_slug)
-        else:
-            user = request.user
-            return self._get_organization_for_user(user, organization_slug)
+        user = request.user
+        return self._get_organization_for_user(user, organization_slug)
 
     def convert_args(self, request: Request, *args, **kwargs):
         """
@@ -182,9 +181,11 @@ class SentryAppPermission(SentryPermission):
             return True
 
         # if app is unpublished, user must be in the Org who owns the app.
-        if not sentry_app.is_published:
-            if sentry_app.owner not in request.user.get_orgs():
-                raise Http404
+        if (
+            not sentry_app.is_published
+            and sentry_app.owner not in request.user.get_orgs()
+        ):
+            raise Http404
 
         # TODO(meredith): make a better way to allow for public
         # endpoints. we can't use ensure_scoped_permission now
@@ -341,12 +342,11 @@ class SentryAppAuthorizationsPermission(SentryPermission):
 
         self.determine_access(request, installation.organization)
 
-        if not request.user.is_sentry_app:
-            return False
-
-        # Request must be made as the app's Proxy User, using their Client ID
-        # and Secret.
-        return request.user == installation.sentry_app.proxy_user
+        return (
+            request.user == installation.sentry_app.proxy_user
+            if request.user.is_sentry_app
+            else False
+        )
 
 
 class SentryAppAuthorizationsBaseEndpoint(SentryAppInstallationBaseEndpoint):

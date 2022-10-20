@@ -14,10 +14,9 @@ class SavedSearchSerializer(Serializer):
         else:
             user_defaults = ()
 
-        attrs = {}
-        for item in item_list:
-            attrs[item] = {"isUserDefault": item.id in user_defaults}
-        return attrs
+        return {
+            item: {"isUserDefault": item.id in user_defaults} for item in item_list
+        }
 
     def serialize(self, obj, attrs, user):
         return {
